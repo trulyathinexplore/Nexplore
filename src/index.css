@@ -1,0 +1,17 @@
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#1A6B4A;--green-dark:#0F5238;--green-light:#E8F5EE;
+  --red:#C94F2C;
+  --sand:#F7F4EF;--sand-dark:#EDE9E1;
+  --charcoal:#2D2D2D;--muted:#888880;--border:#E2DDD6;--white:#ffffff;
+}
+body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--sand);color:var(--charcoal);-webkit-font-smoothing:antialiased;min-height:100vh}
+::-webkit-scrollbar{display:none}
+*{scrollbar-width:none}
+input,button{font-family:inherit}
+input:focus{outline:none}
+button{cursor:pointer;border:none;background:none}
+@keyframes shimmer{0%{background-position:200% 0}to{background-position:-200% 0}}
+@keyframes fadeIn{0%{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.serif{font-family:'Playfair Display',Georgia,serif}
+.fade-in{animation:fadeIn .3s ease both}
