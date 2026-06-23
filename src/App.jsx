@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchEvents, mapEvent } from './supabase.js'
-import { PILLS, REGION_CITIES, matchesPill } from './constants.js'
+import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS } from './constants.js'
 import { readFilters, writeFilters } from './urlState.js'
 import {
   SearchIcon, FilterIcon, EventCard, EventCardSkeleton, PicksRow, FilterDrawer,
@@ -13,7 +13,7 @@ const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCas
 function isThisWeekend(dateStr) {
   const d = new Date(dateStr + 'T12:00:00')
   const now = new Date(); now.setHours(0, 0, 0, 0)
-  const day = now.getDay() // 0 Sun .. 6 Sat
+  const day = now.getDay()
   const sat = new Date(now)
   if (day === 0) sat.setDate(now.getDate() - 1)
   else sat.setDate(now.getDate() + ((6 - day + 7) % 7))
@@ -37,7 +37,6 @@ export default function App() {
   const [amenities, setAmenities] = useState(init.amenities)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // Re-fetch when freeOnly changes (matches live behavior)
   useEffect(() => {
     let cancelled = false
     setLoading(true); setError(null)
@@ -48,7 +47,6 @@ export default function App() {
     return () => { cancelled = true }
   }, [freeOnly])
 
-  // Keep the URL in sync so every filtered view is shareable
   useEffect(() => {
     writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search })
   }, [pill, region, freeOnly, weekend, month, amenities, search])
@@ -56,21 +54,49 @@ export default function App() {
   const activePill = PILLS.find((p) => p.label === pill) || PILLS[0]
   const showAmenities = activePill.type === 'category' || activePill.type === 'tagGroup'
 
+  // Only show date/time chips when Events pill is active
+  const showDateChips = activePill.type === 'eventType'
+
   function choosePill(label) {
     setPill(label)
     const ap = PILLS.find((p) => p.label === label)
     if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
   }
+
   const toggleAmenity = (name) =>
     setAmenities((cur) => (cur.includes(name) ? cur.filter((a) => a !== name) : [...cur, name]))
 
-  // Base filter (everything except amenity narrowing) — also drives amenity options
+  // Detect intent from search: city and/or keyword→pill mapping
+  const searchDetectedPill = detectPillFromSearch(search)
+  const searchDetectedCity = detectCityFromSearch(search)
+
   const passesBase = (ev) => {
     if (search) {
       const s = search.toLowerCase()
-      if (!ev.title.toLowerCase().includes(s) && !(ev.city || '').toLowerCase().includes(s) && !(ev.description || '').toLowerCase().includes(s)) return false
+
+      // If search maps to a pill (e.g. "splash pad" → Water Play), use that pill logic
+      if (searchDetectedPill) {
+        const mappedPill = PILLS.find((p) => p.label === searchDetectedPill)
+        if (mappedPill && !matchesPill(ev, mappedPill)) return false
+      } else {
+        // Normal text search: title, description
+        if (
+          !ev.title.toLowerCase().includes(s) &&
+          !(ev.description || '').toLowerCase().includes(s)
+        ) return false
+      }
+
+      // Location filter: if city detected in search, filter by city
+      if (searchDetectedCity) {
+        if ((ev.city || '').toLowerCase() !== searchDetectedCity.toLowerCase()) return false
+      }
     }
-    if (!matchesPill(ev, activePill)) return false
+
+    // If no search keyword mapping, apply active pill normally
+    if (!searchDetectedPill && !matchesPill(ev, activePill)) return false
+    // If keyword mapped to a pill but user also has a pill selected (not All), still apply it
+    if (searchDetectedPill && activePill.type !== 'all' && !matchesPill(ev, activePill)) return false
+
     if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
     if (month && ev.startDate && new Date(ev.startDate + 'T12:00:00').getMonth() !== 5) return false
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
@@ -78,8 +104,18 @@ export default function App() {
   }
 
   const base = events.filter(passesBase)
+
+  // Amenity options: exclude family-friendly and water-feature tags from sub-pills
   const amenityOptions = [...new Set(
-    base.flatMap((ev) => ev.tags.filter((t) => t.tag_group === 'amenity' || t.tag_group === 'water-feature').map((t) => t.name)),
+    base.flatMap((ev) =>
+      ev.tags
+        .filter((t) => {
+          if (t.tag_group !== 'amenity' && t.tag_group !== 'water-feature') return false
+          if (EXCLUDED_AMENITY_TAGS.includes(t.name.toLowerCase())) return false
+          return true
+        })
+        .map((t) => t.name)
+    ),
   )].sort()
 
   const filtered = base.filter((ev) => amenities.every((a) => ev.tags.some((t) => t.name === a)))
@@ -89,6 +125,10 @@ export default function App() {
   const picks = upcoming.filter((ev) => ev.isEditorPick)
   const filterCount = [month, weekend, freeOnly, !!region].filter(Boolean).length + amenities.length
   const openOfficial = (ev) => { if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank') }
+  const openDirections = (ev) => {
+    const q = encodeURIComponent(ev.fullAddress || ev.title)
+    window.open(`https://maps.google.com/?q=${q}`, '_blank')
+  }
 
   const chips = [
     { label: '🗓 June', active: month, toggle: () => setMonth((v) => !v) },
@@ -129,7 +169,7 @@ export default function App() {
         ))}
       </div>
 
-      {/* Amenity sub-filters (contextual, when a category or Water Play is active) */}
+      {/* Amenity sub-filters — only when category or Water Play active, excluding family-friendly */}
       {showAmenities && amenityOptions.length > 0 && (
         <div style={{ display: 'flex', gap: 6, padding: '8px 0 0 16px', overflowX: 'auto' }}>
           {amenityOptions.map((name) => {
@@ -141,12 +181,19 @@ export default function App() {
         </div>
       )}
 
-      {/* Quick subfilter chips */}
-      <div style={{ display: 'flex', gap: 6, padding: '7px 16px 9px', borderBottom: '0.5px solid #E2DDD6', overflowX: 'auto' }}>
-        {chips.map(({ label, active, toggle }) => (
-          <div key={label} onClick={toggle} style={{ flexShrink: 0, fontSize: 10, fontWeight: active ? 600 : 500, padding: '3px 10px', borderRadius: 20, border: `0.5px solid ${active ? '#1A6B4A' : '#E2DDD6'}`, color: active ? '#1A6B4A' : '#888880', background: active ? '#E8F5EE' : 'white', cursor: 'pointer' }}>{label}</div>
-        ))}
-      </div>
+      {/* Date/time chips — ONLY when Events pill is active */}
+      {showDateChips && (
+        <div style={{ display: 'flex', gap: 6, padding: '7px 16px 9px', borderBottom: '0.5px solid #E2DDD6', overflowX: 'auto' }}>
+          {chips.map(({ label, active, toggle }) => (
+            <div key={label} onClick={toggle} style={{ flexShrink: 0, fontSize: 10, fontWeight: active ? 600 : 500, padding: '3px 10px', borderRadius: 20, border: `0.5px solid ${active ? '#1A6B4A' : '#E2DDD6'}`, color: active ? '#1A6B4A' : '#888880', background: active ? '#E8F5EE' : 'white', cursor: 'pointer' }}>{label}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Divider when no date chips showing */}
+      {!showDateChips && (
+        <div style={{ borderBottom: '0.5px solid #E2DDD6', margin: '7px 0 0' }} />
+      )}
 
       {/* Count */}
       <div style={{ fontSize: 9, fontWeight: 700, color: '#888880', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '9px 16px 6px' }}>
@@ -163,15 +210,24 @@ export default function App() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px' }}>
         {loading
           ? [1, 2, 3, 4].map((i) => <EventCardSkeleton key={i} />)
-          : upcoming.map((ev) => <EventCard key={ev.id} event={ev} onSelect={openOfficial} isEditorPick={ev.isEditorPick} />)}
+          : upcoming.map((ev) => (
+              <EventCard
+                key={ev.id}
+                event={ev}
+                onSelect={openOfficial}
+                onDirections={openDirections}
+                isEditorPick={ev.isEditorPick}
+                isPlayground={ev.contentType === 'playground'}
+              />
+            ))}
       </div>
 
-      {/* Past events (dimmed) */}
+      {/* Past events */}
       {!loading && past.length > 0 && (
         <>
           <div style={{ fontSize: 9, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '8px 16px 6px', borderTop: '0.5px solid #E2DDD6' }}>Past events</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px', opacity: 0.5 }}>
-            {past.map((ev) => <EventCard key={ev.id} event={ev} onSelect={openOfficial} />)}
+            {past.map((ev) => <EventCard key={ev.id} event={ev} onSelect={openOfficial} onDirections={openDirections} />)}
           </div>
         </>
       )}
