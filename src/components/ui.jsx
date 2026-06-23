@@ -23,7 +23,6 @@ export function FilterIcon({ active }) {
   )
 }
 
-// Image with Microlink fallback resolution, shimmer while loading, initial-letter fallback
 export function EventImage({ event, height }) {
   const [src, setSrc] = useState(event.imageUrl)
   const [loading, setLoading] = useState(false)
@@ -37,7 +36,6 @@ export function EventImage({ event, height }) {
         .catch(() => setFailed(true))
         .finally(() => setLoading(false))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (src && !failed) {
@@ -89,19 +87,23 @@ export function EventCardSkeleton() {
   )
 }
 
-export function EventCard({ event, onSelect, isEditorPick }) {
+export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayground }) {
+  // Show city name if available, otherwise fall back to area
+  const locationLabel = event.city || event.area || 'Bay Area'
+  const priceLabel = event.free ? 'Free' : event.price
+
   return (
     <div
-      onClick={() => onSelect(event)}
       style={{
         borderRadius: 14, overflow: 'hidden', background: 'white', border: '0.5px solid #E2DDD6',
-        boxShadow: '0 2px 8px rgba(26,107,74,0.08)', cursor: 'pointer', animation: 'fadeIn 0.3s ease',
+        boxShadow: '0 2px 8px rgba(26,107,74,0.08)', animation: 'fadeIn 0.3s ease',
         transition: 'transform 0.15s, box-shadow 0.15s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(26,107,74,0.15)' }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(26,107,74,0.08)' }}
     >
-      <div style={{ position: 'relative' }}>
+      {/* Image — clicking image opens official URL */}
+      <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => onSelect(event)}>
         <EventImage event={event} height={150} />
         {event.free ? (
           <div style={{ position: 'absolute', top: 7, left: 7, background: '#1A6B4A', color: 'white', fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5 }}>FREE</div>
@@ -112,14 +114,52 @@ export function EventCard({ event, onSelect, isEditorPick }) {
           <div style={{ position: 'absolute', top: 7, right: 7, background: '#C94F2C', color: 'white', fontSize: 7, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>✦ Pick</div>
         )}
       </div>
+
       <div style={{ padding: '8px 10px 10px' }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: '#C94F2C', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{event.dayLabel}</div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#2D2D2D', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: 3 }}>{event.title}</div>
-        <div style={{ fontSize: 10, color: '#888880', marginBottom: 6 }}>{event.city || event.area} · {event.free ? 'Free' : event.price}</div>
+        {event.dayLabel && (
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#C94F2C', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{event.dayLabel}</div>
+        )}
+        <div
+          onClick={() => onSelect(event)}
+          style={{ fontSize: 12, fontWeight: 600, color: '#2D2D2D', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: 3, cursor: 'pointer' }}
+        >
+          {event.title}
+        </div>
+
+        {/* City name instead of "Bay Area" */}
+        <div style={{ fontSize: 10, color: '#888880', marginBottom: 6 }}>
+          {locationLabel}{priceLabel ? ` · ${priceLabel}` : ''}
+        </div>
+
         {event.ages && (
           <div style={{ display: 'inline-block', background: '#E8F5EE', color: '#1A6B4A', fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, marginBottom: 7 }}>Ages {event.ages}</div>
         )}
-        <div style={{ display: 'block', width: '100%', padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}>Learn more →</div>
+
+        {/* Playground: two buttons side by side */}
+        {isPlayground ? (
+          <div style={{ display: 'flex', gap: 5 }}>
+            <div
+              onClick={(e) => { e.stopPropagation(); onDirections && onDirections(event) }}
+              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #1A6B4A', background: 'white', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}
+            >
+              📍 Directions
+            </div>
+            <div
+              onClick={(e) => { e.stopPropagation(); onSelect(event) }}
+              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}
+            >
+              Learn more →
+            </div>
+          </div>
+        ) : (
+          /* All other cards: single Learn More button */
+          <div
+            onClick={() => onSelect(event)}
+            style={{ display: 'block', width: '100%', padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}
+          >
+            Learn more →
+          </div>
+        )}
       </div>
     </div>
   )
