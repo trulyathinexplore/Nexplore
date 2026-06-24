@@ -114,15 +114,14 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
   }
 
   // Extract pricing from description (e.g., "Adults $10-14 | Kids 5& under FREE | Parking $10")
-  const extractPrice = () => {
-    if (event.free) return 'Free'
-    if (event.price) return event.price
-    if (event.description) {
-      const priceMatch = event.description.match(/\$\d+/)
-      if (priceMatch) return `From ${priceMatch[0]}`
-    }
-    return null
+ const extractPrice = () => {
+  if (event.price) return event.price
+  if (event.description) {
+    const priceMatch = event.description.match(/\$\d+/)
+    if (priceMatch) return `From ${priceMatch[0]}`
   }
+  return null
+}
 
   const displayPrice = extractPrice()
   const dateRange = formatDateRange()
