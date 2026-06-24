@@ -90,7 +90,42 @@ export function EventCardSkeleton() {
 export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayground }) {
   // Show city name if available, otherwise fall back to area
   const locationLabel = event.city || event.area || 'Bay Area'
-  const priceLabel = event.free ? 'Free' : event.price
+
+  // Format date range for multi-day events
+  const formatDateRange = () => {
+    if (!event.startDate) return event.dayLabel || ''
+    const start = new Date(event.startDate + 'T12:00:00')
+    const end = new Date(event.endDate + 'T12:00:00')
+    
+    const startMonth = start.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+    const startDay = start.getDate()
+    const endMonth = end.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+    const endDay = end.getDate()
+    
+    if (start.getTime() === end.getTime()) {
+      return `${startMonth} ${startDay}`
+    }
+    
+    if (start.getMonth() === end.getMonth()) {
+      return `${startMonth} ${startDay}–${endDay}`
+    }
+    
+    return `${startMonth} ${startDay} – ${endMonth} ${endDay}`
+  }
+
+  // Extract pricing from description (e.g., "Adults $10-14 | Kids 5& under FREE | Parking $10")
+  const extractPrice = () => {
+    if (event.free) return 'Free'
+    if (event.price) return event.price
+    if (event.description) {
+      const priceMatch = event.description.match(/\$\d+/)
+      if (priceMatch) return `From ${priceMatch[0]}`
+    }
+    return null
+  }
+
+  const displayPrice = extractPrice()
+  const dateRange = formatDateRange()
 
   return (
     <div
@@ -107,8 +142,8 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
         <EventImage event={event} height={150} />
         {event.free ? (
           <div style={{ position: 'absolute', top: 7, left: 7, background: '#1A6B4A', color: 'white', fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5 }}>FREE</div>
-        ) : event.price ? (
-          <div style={{ position: 'absolute', top: 7, left: 7, background: '#2D2D2D', color: 'white', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>{event.price}</div>
+        ) : displayPrice ? (
+          <div style={{ position: 'absolute', top: 7, left: 7, background: '#2D2D2D', color: 'white', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>{displayPrice}</div>
         ) : null}
         {isEditorPick && (
           <div style={{ position: 'absolute', top: 7, right: 7, background: '#C94F2C', color: 'white', fontSize: 7, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>✦ Pick</div>
@@ -116,8 +151,8 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
       </div>
 
       <div style={{ padding: '8px 10px 10px' }}>
-        {event.dayLabel && (
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#C94F2C', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{event.dayLabel}</div>
+        {dateRange && (
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#C94F2C', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{dateRange}</div>
         )}
         <div
           onClick={() => onSelect(event)}
@@ -126,9 +161,9 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
           {event.title}
         </div>
 
-        {/* City name instead of "Bay Area" */}
+        {/* City name and pricing */}
         <div style={{ fontSize: 10, color: '#888880', marginBottom: 6 }}>
-          {locationLabel}{priceLabel ? ` · ${priceLabel}` : ''}
+          {locationLabel}{displayPrice ? ` · ${displayPrice}` : ''}
         </div>
 
         {event.ages && (
