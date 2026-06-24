@@ -57,11 +57,13 @@ export default function App() {
   // Only show date/time chips when Events pill is active
   const showDateChips = activePill.type === 'eventType'
 
-  function choosePill(label) {
-    setPill(label)
-    const ap = PILLS.find((p) => p.label === label)
-    if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
-  }
+ function choosePill(label) {
+  setPill(label)
+  const ap = PILLS.find((p) => p.label === label)
+  if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
+  // Auto-deactivate month filter when leaving Events pill
+  if (ap.type !== 'eventType') setMonth(false)
+}
 
   const toggleAmenity = (name) =>
     setAmenities((cur) => (cur.includes(name) ? cur.filter((a) => a !== name) : [...cur, name]))
