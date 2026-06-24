@@ -120,8 +120,8 @@ export default function App() {
 
   const filtered = base.filter((ev) => amenities.every((a) => ev.tags.some((t) => t.name === a)))
   const now = new Date()
-  const upcoming = filtered.filter((ev) => !ev.startDate || new Date(ev.startDate + 'T23:59:59') >= now)
-  const past = filtered.filter((ev) => ev.startDate && new Date(ev.startDate + 'T23:59:59') < now)
+  const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
+const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
   const picks = upcoming.filter((ev) => ev.isEditorPick)
   const filterCount = [month, weekend, freeOnly, !!region].filter(Boolean).length + amenities.length
   const openOfficial = (ev) => { if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank') }
