@@ -9,7 +9,7 @@ const headers = {
 
 // Embed category name + tags + venue (for city/address) so pills/amenities can filter on them.
 export async function fetchEvents({ freeOnly = false } = {}) {
-  const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,address,city,state)'
+const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,address,city,state)'
   let url = `${SUPABASE_URL}/rest/v1/events?select=${encodeURIComponent(select)}&order=start_date.asc`
   if (freeOnly) url += '&is_free=eq.true'
   const res = await fetch(url, { headers })
@@ -56,6 +56,7 @@ export function mapEvent(e) {
     eventType: e.event_type || e.content_type || 'event',
     contentType: e.content_type || '',
     seriesName: e.series_name || '',
+    seasonalType: e.seasonal_type || null,
     category: e.categories?.name || null,
     tags: (e.event_tags || []).map((et) => et.tags).filter(Boolean),
   }
