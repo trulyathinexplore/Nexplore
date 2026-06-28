@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fetchEvents, mapEvent } from './supabase.js'
 import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS } from './constants.js'
+import { trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch, trackPageEngagement, trackJuly4thFilter } from './analytics.js'
 import { readFilters, writeFilters } from './urlState.js'
 import {
   SearchIcon, FilterIcon, EventCard, EventCardSkeleton, PicksRow, FilterDrawer,
@@ -56,7 +57,20 @@ export default function App() {
 
   // Only show date/time chips when Events pill is active
   const showDateChips = activePill.type === 'eventType'
-
+unction choosePill(label) {
+  setPill(label)
+  
+  // ADD THIS LINE:
+  if (label === 'July 4th') {
+    trackJuly4thFilter();
+  } else {
+    trackPillClick(label);
+  }
+  
+  const ap = PILLS.find((p) => p.label === label)
+  if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
+  if (ap.type !== 'eventType') setMonth(false)
+}
  function choosePill(label) {
   setPill(label)
   const ap = PILLS.find((p) => p.label === label)
@@ -137,7 +151,90 @@ const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59
     { label: '📅 This weekend', active: weekend, toggle: () => setWeekend((v) => !v) },
     { label: '🏷 Free only', active: freeOnly, toggle: () => setFreeOnly((v) => !v) },
   ]
+<input
+  type="text" 
+  value={search} 
+  onChange={(e) => {
+    const newSearch = e.target.value;
+    setSearch(newSearch);
+    // ADD THIS:
+    if (newSearch.length > 2) {
+      trackSearch(newSearch);
+    }
+  }}
+  placeholder="Search events, parks, farms..."
+  ...
+/>
+    // Step 4: Track filter toggles (region, free only, weekend, month)
+// For region filter (in FilterDrawer component or where region is set):
+const handleRegionSelect = (region) => {
+  setRegion(region);
+  // ADD THIS:
+  trackFilterApplied('region', region);
+};
 
+// For free only toggle (around line 138):
+const toggleFreeOnly = () => {
+  setFreeOnly((v) => !v);
+  // ADD THIS:
+  trackFilterApplied('free_only', !freeOnly ? 'enabled' : 'disabled');
+};
+
+// For weekend toggle:
+const toggleWeekend = () => {
+  setWeekend((v) => !v);
+  // ADD THIS:
+  trackFilterApplied('weekend', !weekend ? 'enabled' : 'disabled');
+};
+
+// For month toggle:
+const toggleMonth = () => {
+  setMonth((v) => !v);
+  // ADD THIS:
+  trackFilterApplied('month', !month ? 'enabled' : 'disabled');
+};
+
+// Step 5: Track "Learn more" and "Directions" clicks (around line 129-132)
+const openOfficial = (ev) => {
+  // ADD THIS:
+  trackEventClickThrough(ev.title, 'learn_more');
+  if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank')
+}
+
+const openDirections = (ev) => {
+  // ADD THIS:
+  trackEventClickThrough(ev.title, 'directions');
+  const q = encodeURIComponent(ev.fullAddress || ev.title)
+  window.open(`https://maps.google.com/?q=${q}`, '_blank')
+}
+
+// Step 6: Track page engagement time (useEffect at component start)
+useEffect(() => {
+  const startTime = Date.now();
+  return () => {
+    const timeSpent = (Date.now() - startTime) / 1000; // convert to seconds
+    trackPageEngagement(timeSpent);
+  };
+}, []);
+
+// Step 7: Track when user views an event card (in EventCard component or render)
+// When rendering EventCard:
+upcoming.map((ev) => (
+  <EventCard
+    key={ev.id}
+    event={ev}
+    onSelect={(event) => {
+      trackEventClickThrough(event.title, 'card_click');
+      openOfficial(event);
+    }}
+    onDirections={(event) => {
+      trackEventClickThrough(event.title, 'directions_card');
+      openDirections(event);
+    }}
+    isEditorPick={ev.isEditorPick}
+    isPlayground={ev.contentType === 'playground'}
+  />
+))
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#F7F4EF' }}>
       {/* Header */}
