@@ -52,37 +52,59 @@ export default function App() {
     writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search })
   }, [pill, region, freeOnly, weekend, month, amenities, search])
 
+  // Track page engagement (time spent on page)
+  useEffect(() => {
+    const startTime = Date.now()
+    return () => {
+      const timeSpent = (Date.now() - startTime) / 1000
+      trackPageEngagement(timeSpent)
+    }
+  }, [])
+
   const activePill = PILLS.find((p) => p.label === pill) || PILLS[0]
   const showAmenities = activePill.type === 'category' || activePill.type === 'tagGroup'
 
   // Only show date/time chips when Events pill is active
   const showDateChips = activePill.type === 'eventType'
-unction choosePill(label) {
-  setPill(label)
-  
-  // ADD THIS LINE:
-  if (label === 'July 4th') {
-    trackJuly4thFilter();
-  } else {
-    trackPillClick(label);
+
+  function choosePill(label) {
+    setPill(label)
+    // Track pill clicks (July 4th gets its own event)
+    if (label === 'July 4th') {
+      trackJuly4thFilter()
+    } else {
+      trackPillClick(label)
+    }
+    const ap = PILLS.find((p) => p.label === label)
+    if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
+    // Auto-deactivate month filter when leaving Events pill
+    if (ap.type !== 'eventType') setMonth(false)
   }
-  
-  const ap = PILLS.find((p) => p.label === label)
-  if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
-  if (ap.type !== 'eventType') setMonth(false)
-}
- function choosePill(label) {
-  setPill(label)
-  const ap = PILLS.find((p) => p.label === label)
-  if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
-  // Auto-deactivate month filter when leaving Events pill
-  if (ap.type !== 'eventType') setMonth(false)
-}
 
   const toggleAmenity = (name) =>
     setAmenities((cur) => (cur.includes(name) ? cur.filter((a) => a !== name) : [...cur, name]))
 
-  // Detect intent from search: city and/or keyword→pill mapping
+  // Search handler with tracking
+  const handleSearchChange = (newSearch) => {
+    setSearch(newSearch)
+    if (newSearch.length > 2) trackSearch(newSearch)
+  }
+
+  // Filter toggles with tracking
+  const toggleFreeOnly = () => {
+    setFreeOnly((v) => !v)
+    trackFilterApplied('free_only', !freeOnly ? 'enabled' : 'disabled')
+  }
+  const toggleWeekend = () => {
+    setWeekend((v) => !v)
+    trackFilterApplied('weekend', !weekend ? 'enabled' : 'disabled')
+  }
+  const toggleMonth = () => {
+    setMonth((v) => !v)
+    trackFilterApplied('month', !month ? 'enabled' : 'disabled')
+  }
+
+  // Detect intent from search: city and/or keyword to pill mapping
   const searchDetectedPill = detectPillFromSearch(search)
   const searchDetectedCity = detectCityFromSearch(search)
 
@@ -90,7 +112,7 @@ unction choosePill(label) {
     if (search) {
       const s = search.toLowerCase()
 
-      // If search maps to a pill (e.g. "splash pad" → Water Play), use that pill logic
+      // If search maps to a pill (e.g. "splash pad" to Water Play), use that pill logic
       if (searchDetectedPill) {
         const mappedPill = PILLS.find((p) => p.label === searchDetectedPill)
         if (mappedPill && !matchesPill(ev, mappedPill)) return false
@@ -137,104 +159,27 @@ unction choosePill(label) {
   const filtered = base.filter((ev) => amenities.every((a) => ev.tags.some((t) => t.name === a)))
   const now = new Date()
   const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
-const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
+  const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
   const picks = upcoming.filter((ev) => ev.isEditorPick)
   const filterCount = [month, weekend, freeOnly, !!region].filter(Boolean).length + amenities.length
-  const openOfficial = (ev) => { if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank') }
+
+  // Click-through handlers with tracking
+  const openOfficial = (ev) => {
+    trackEventClickThrough(ev.title, 'learn_more')
+    if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank')
+  }
   const openDirections = (ev) => {
+    trackEventClickThrough(ev.title, 'directions')
     const q = encodeURIComponent(ev.fullAddress || ev.title)
     window.open(`https://maps.google.com/?q=${q}`, '_blank')
   }
 
   const chips = [
-    { label: '🗓 June', active: month, toggle: () => setMonth((v) => !v) },
-    { label: '📅 This weekend', active: weekend, toggle: () => setWeekend((v) => !v) },
-    { label: '🏷 Free only', active: freeOnly, toggle: () => setFreeOnly((v) => !v) },
+    { label: '🗓 June', active: month, toggle: toggleMonth },
+    { label: '📅 This weekend', active: weekend, toggle: toggleWeekend },
+    { label: '🏷 Free only', active: freeOnly, toggle: toggleFreeOnly },
   ]
-<input
-  type="text" 
-  value={search} 
-  onChange={(e) => {
-    const newSearch = e.target.value;
-    setSearch(newSearch);
-    // ADD THIS:
-    if (newSearch.length > 2) {
-      trackSearch(newSearch);
-    }
-  }}
-  placeholder="Search events, parks, farms..."
-  ...
-/>
-    // Step 4: Track filter toggles (region, free only, weekend, month)
-// For region filter (in FilterDrawer component or where region is set):
-const handleRegionSelect = (region) => {
-  setRegion(region);
-  // ADD THIS:
-  trackFilterApplied('region', region);
-};
 
-// For free only toggle (around line 138):
-const toggleFreeOnly = () => {
-  setFreeOnly((v) => !v);
-  // ADD THIS:
-  trackFilterApplied('free_only', !freeOnly ? 'enabled' : 'disabled');
-};
-
-// For weekend toggle:
-const toggleWeekend = () => {
-  setWeekend((v) => !v);
-  // ADD THIS:
-  trackFilterApplied('weekend', !weekend ? 'enabled' : 'disabled');
-};
-
-// For month toggle:
-const toggleMonth = () => {
-  setMonth((v) => !v);
-  // ADD THIS:
-  trackFilterApplied('month', !month ? 'enabled' : 'disabled');
-};
-
-// Step 5: Track "Learn more" and "Directions" clicks (around line 129-132)
-const openOfficial = (ev) => {
-  // ADD THIS:
-  trackEventClickThrough(ev.title, 'learn_more');
-  if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank')
-}
-
-const openDirections = (ev) => {
-  // ADD THIS:
-  trackEventClickThrough(ev.title, 'directions');
-  const q = encodeURIComponent(ev.fullAddress || ev.title)
-  window.open(`https://maps.google.com/?q=${q}`, '_blank')
-}
-
-// Step 6: Track page engagement time (useEffect at component start)
-useEffect(() => {
-  const startTime = Date.now();
-  return () => {
-    const timeSpent = (Date.now() - startTime) / 1000; // convert to seconds
-    trackPageEngagement(timeSpent);
-  };
-}, []);
-
-// Step 7: Track when user views an event card (in EventCard component or render)
-// When rendering EventCard:
-upcoming.map((ev) => (
-  <EventCard
-    key={ev.id}
-    event={ev}
-    onSelect={(event) => {
-      trackEventClickThrough(event.title, 'card_click');
-      openOfficial(event);
-    }}
-    onDirections={(event) => {
-      trackEventClickThrough(event.title, 'directions_card');
-      openDirections(event);
-    }}
-    isEditorPick={ev.isEditorPick}
-    isPlayground={ev.contentType === 'playground'}
-  />
-))
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#F7F4EF' }}>
       {/* Header */}
@@ -250,7 +195,7 @@ upcoming.map((ev) => (
         <div style={{ display: 'flex', alignItems: 'center', background: 'white', borderRadius: 50, border: '1px solid #E2DDD6', padding: '0 6px 0 14px', height: 44, boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }}>
           <SearchIcon />
           <input
-            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search events, parks, farms..."
             style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: '#2D2D2D', padding: '0 10px', fontFamily: "'DM Sans', sans-serif" }}
           />
