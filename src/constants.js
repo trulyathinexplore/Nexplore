@@ -5,6 +5,7 @@ export const PILLS = [
   { label: 'Events',        type: 'eventType', value: 'event' },
   { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature' },
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
+  { label: 'July 4th',      type: 'seasonalType', value: 'july-4th' },
   { label: 'Farm',          type: 'category',  value: 'Farm Experience' },
   { label: 'Park',          type: 'category',  value: 'Park' },
   { label: 'Museum',        type: 'category',  value: 'Museum' },
@@ -61,6 +62,7 @@ export function matchesPill(ev, pill) {
     return vals.includes(ev.category)
   }
   if (pill.type === 'tagGroup') return ev.tags.some((t) => t.tag_group === pill.value)
+  if (pill.type === 'seasonalType') return ev.seasonalType === pill.value
   return true
 }
 // Sub-filter tags to always exclude from amenity pills
