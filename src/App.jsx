@@ -143,20 +143,26 @@ export default function App() {
 
   const base = events.filter(passesBase)
 
-  // Amenity options: exclude family-friendly and water-feature tags from sub-pills
-  const amenityOptions = [...new Set(
-    base.flatMap((ev) =>
-      ev.tags
-        .filter((t) => {
-          if (t.tag_group !== 'amenity' && t.tag_group !== 'water-feature') return false
-          if (EXCLUDED_AMENITY_TAGS.includes(t.name.toLowerCase())) return false
-          return true
-        })
-        .map((t) => t.name)
-    ),
-  )].sort()
+  // Amenity sub-pills: use a fixed curated list if the active pill declares one (Playground, Water Play),
+  // otherwise fall back to the original dynamic computation (Farm, Museum, County Fairs, etc. — unchanged)
+  const amenityOptions = activePill.fixedAmenities
+    ? activePill.fixedAmenities
+    : [...new Set(
+        base.flatMap((ev) =>
+          ev.tags
+            .filter((t) => {
+              if (t.tag_group !== 'amenity' && t.tag_group !== 'water-feature') return false
+              if (EXCLUDED_AMENITY_TAGS.includes(t.name.toLowerCase())) return false
+              return true
+            })
+            .map((t) => t.name)
+        ),
+      )].sort()
 
-  const filtered = base.filter((ev) => amenities.every((a) => ev.tags.some((t) => t.name === a)))
+  // 'free' is a special case — it maps to price_type ('ev.free'), not a tag, so it can't be matched via ev.tags
+  const filtered = base.filter((ev) =>
+    amenities.every((a) => (a === 'free' ? ev.free === true : ev.tags.some((t) => t.name === a)))
+  )
   const now = new Date()
   const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
   const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
@@ -276,13 +282,22 @@ export default function App() {
         </>
       )}
 
-      {/* Empty state */}
+      {/* Empty state — pill-level "Coming soon" (zero matches before any sub-pill filter)
+          vs. the existing "no results" message (a sub-pill/amenity combo emptied out an otherwise populated pill) */}
       {!loading && upcoming.length === 0 && !error && (
-        <div style={{ textAlign: 'center', padding: '50px 24px' }}>
-          <div style={{ fontSize: 44, marginBottom: 14 }}>🌿</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 6 }}>No events found</div>
-          <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7 }}>Try removing a filter or selecting a different neighborhood.</div>
-        </div>
+        base.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '50px 24px' }}>
+            <div style={{ fontSize: 44, marginBottom: 14 }}>🚧</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 6 }}>Coming soon</div>
+            <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7 }}>We're still adding things to do here — check back soon.</div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '50px 24px' }}>
+            <div style={{ fontSize: 44, marginBottom: 14 }}>🌿</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 6 }}>No events found</div>
+            <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7 }}>Try removing a filter or selecting a different neighborhood.</div>
+          </div>
+        )
       )}
 
       <div style={{ height: 32 }} />
