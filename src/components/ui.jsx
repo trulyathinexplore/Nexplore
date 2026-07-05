@@ -23,7 +23,7 @@ export function FilterIcon({ active }) {
   )
 }
 
-export function EventImage({ event, height }) {
+export function EventImage({ event, height, aspectRatio }) {
   const [src, setSrc] = useState(event.imageUrl)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -38,20 +38,23 @@ export function EventImage({ event, height }) {
     }
   }, [])
 
+  // aspectRatio (e.g. "4 / 5") is used for Playground cards; height (px) is used everywhere else, unchanged
+  const sizeStyle = aspectRatio ? { width: '100%', aspectRatio } : { width: '100%', height }
+
   if (src && !failed) {
     return (
       <img
         src={src}
         alt={event.title}
         onError={() => { setSrc(null); setFailed(true) }}
-        style={{ width: '100%', height, objectFit: 'cover', display: 'block' }}
+        style={{ ...sizeStyle, objectFit: 'cover', display: 'block' }}
       />
     )
   }
   if (loading) {
     return (
       <div style={{
-        width: '100%', height,
+        ...sizeStyle,
         background: 'linear-gradient(90deg,#e8f5ee 25%,#d4e8da 50%,#e8f5ee 75%)',
         backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite',
       }} />
@@ -59,9 +62,9 @@ export function EventImage({ event, height }) {
   }
   return (
     <div style={{
-      width: '100%', height, background: cardBg(event.id),
+      ...sizeStyle, background: cardBg(event.id),
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: height * 0.35, color: '#1A6B4A', fontFamily: "'Playfair Display', serif", fontWeight: 700,
+      fontSize: aspectRatio ? 40 : height * 0.35, color: '#1A6B4A', fontFamily: "'Playfair Display', serif", fontWeight: 700,
     }}>
       {event.title.charAt(0)}
     </div>
@@ -96,20 +99,20 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
     if (!event.startDate) return event.dayLabel || ''
     const start = new Date(event.startDate + 'T12:00:00')
     const end = new Date(event.endDate + 'T12:00:00')
-    
+
     const startMonth = start.toLocaleString('en-US', { month: 'short' }).toUpperCase()
     const startDay = start.getDate()
     const endMonth = end.toLocaleString('en-US', { month: 'short' }).toUpperCase()
     const endDay = end.getDate()
-    
+
     if (start.getTime() === end.getTime()) {
       return `${startMonth} ${startDay}`
     }
-    
+
     if (start.getMonth() === end.getMonth()) {
       return `${startMonth} ${startDay}–${endDay}`
     }
-    
+
     return `${startMonth} ${startDay} – ${endMonth} ${endDay}`
   }
 
@@ -138,7 +141,11 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
     >
       {/* Image — clicking image opens official URL */}
       <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => onSelect(event)}>
-        <EventImage event={event} height={150} />
+        {isPlayground ? (
+          <EventImage event={event} aspectRatio="4 / 5" />
+        ) : (
+          <EventImage event={event} height={150} />
+        )}
         {event.free ? (
           <div style={{ position: 'absolute', top: 7, left: 7, background: '#1A6B4A', color: 'white', fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5 }}>FREE</div>
         ) : displayPrice ? (
@@ -147,52 +154,63 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
         {isEditorPick && (
           <div style={{ position: 'absolute', top: 7, right: 7, background: '#C94F2C', color: 'white', fontSize: 7, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>✦ Pick</div>
         )}
+        {isPlayground && (
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', padding: '6px 8px' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {event.title}
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {locationLabel}{displayPrice ? ` · ${displayPrice}` : ''}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div style={{ padding: '8px 10px 10px' }}>
-        {dateRange && (
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#C94F2C', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{dateRange}</div>
-        )}
-        <div
-          onClick={() => onSelect(event)}
-          style={{ fontSize: 12, fontWeight: 600, color: '#2D2D2D', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: 3, cursor: 'pointer' }}
-        >
-          {event.title}
-        </div>
-
-        {/* City name and pricing */}
-        <div style={{ fontSize: 10, color: '#888880', marginBottom: 6 }}>
-          {locationLabel}{displayPrice ? ` · ${displayPrice}` : ''}
-        </div>
-
-        {event.ages && (
-          <div style={{ display: 'inline-block', background: '#E8F5EE', color: '#1A6B4A', fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, marginBottom: 7 }}>Ages {event.ages}</div>
-        )}
-
-        {/* Playground: two buttons side by side */}
+      <div style={{ padding: isPlayground ? '8px 10px' : '8px 10px 10px' }}>
         {isPlayground ? (
+          /* Playground: title/location live on the scrim above, age tag removed, buttons unchanged */
           <div style={{ display: 'flex', gap: 5 }}>
             <div
               onClick={(e) => { e.stopPropagation(); onDirections && onDirections(event) }}
-              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #1A6B4A', background: 'white', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #1A6B4A', background: 'white', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               📍 Directions
             </div>
             <div
               onClick={(e) => { e.stopPropagation(); onSelect(event) }}
-              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               Learn more →
             </div>
           </div>
         ) : (
-          /* All other cards: single Learn More button */
-          <div
-            onClick={() => onSelect(event)}
-            style={{ display: 'block', width: '100%', padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}
-          >
-            Learn more →
-          </div>
+          /* All other cards: unchanged from before */
+          <>
+            {dateRange && (
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#C94F2C', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{dateRange}</div>
+            )}
+            <div
+              onClick={() => onSelect(event)}
+              style={{ fontSize: 12, fontWeight: 600, color: '#2D2D2D', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: 3, cursor: 'pointer' }}
+            >
+              {event.title}
+            </div>
+
+            <div style={{ fontSize: 10, color: '#888880', marginBottom: 6 }}>
+              {locationLabel}{displayPrice ? ` · ${displayPrice}` : ''}
+            </div>
+
+            {event.ages && (
+              <div style={{ display: 'inline-block', background: '#E8F5EE', color: '#1A6B4A', fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, marginBottom: 7 }}>Ages {event.ages}</div>
+            )}
+
+            <div
+              onClick={() => onSelect(event)}
+              style={{ display: 'block', width: '100%', padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}
+            >
+              Learn more →
+            </div>
+          </>
         )}
       </div>
     </div>
