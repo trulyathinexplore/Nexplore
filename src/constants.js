@@ -1,13 +1,17 @@
 // Pill config — each pill declares HOW it filters.
 // type: 'all' | 'eventType' | 'category' | 'tagGroup'
+// fixedAmenities (optional): a curated, always-shown sub-pill list. If absent,
+// sub-pills are computed dynamically from whatever tags exist on matching events (unchanged default behavior).
 export const PILLS = [
   { label: 'All',           type: 'all' },
-  { label: 'Events',        type: 'eventType', value: 'event' },
-  { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature' },
+  { label: 'Playground',    type: 'category',  value: 'Playground',
+    fixedAmenities: ['free', 'parking-onsite', 'picnic-area', 'shaded', 'restrooms', 'splash-pad', 'wheelchair-accessible'] },
+  { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature',
+    fixedAmenities: ['fountain', 'free-entry', 'splash-pad', 'waterparks'] },
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
   { label: 'July 4th',      type: 'seasonalType', value: 'july-4th' },
+  { label: 'Events',        type: 'eventType', value: 'event' },
   { label: 'Farm',          type: 'category',  value: 'Farm Experience' },
-  { label: 'Park',          type: 'category',  value: 'Park' },
   { label: 'Museum',        type: 'category',  value: 'Museum' },
 ]
 export const REGIONS = ['San Francisco', 'East Bay', 'South Bay', 'Peninsula', 'North Bay', 'Tri-Valley']
