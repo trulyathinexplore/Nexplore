@@ -267,7 +267,7 @@ export default function App() {
                 onSelect={openOfficial}
                 onDirections={openDirections}
                 isEditorPick={ev.isEditorPick}
-                isPlayground={ev.contentType === 'playground'}
+                isPlayground={ev.category === 'Playground'}
               />
             ))}
       </div>
