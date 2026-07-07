@@ -11,7 +11,7 @@ export const PILLS = [
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
   { label: 'July 4th',      type: 'seasonalType', value: 'july-4th' },
   { label: 'Events',        type: 'eventType', value: 'event' },
-  { label: 'Zoo & Aquarium', type: 'category', value: ['Zoo', 'Aquarium'},
+  { label: 'Zoo & Aquarium', type: 'category', value: ['Zoo', 'Aquarium']},
   { label: 'Museum',        type: 'category',  value: 'Museum' },
 ]
 export const REGIONS = ['San Francisco', 'East Bay', 'South Bay', 'Peninsula', 'North Bay', 'Tri-Valley']
