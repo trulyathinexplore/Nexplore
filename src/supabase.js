@@ -26,6 +26,10 @@ const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,
 }
 
 export function mapEvent(e) {
+  // Beaches arrive already in app shape (see mapBeach) — passing them through
+  // mapEvent a second time would strip category/tags, so short-circuit here.
+  if (e && e.__isBeach) return e
+
   // Prefer venue city over event-level city field
   const venueCity = e.venues?.city || ''
   const venueAddress = e.venues?.address || ''
@@ -73,6 +77,7 @@ export function mapEvent(e) {
 // Map beach data to event format
 export function mapBeach(beach) {
   return {
+    __isBeach: true,
     id: beach.id,
     title: beach.title,
     description: beach.description || '',
@@ -80,7 +85,7 @@ export function mapBeach(beach) {
     officialUrl: beach.officialUrl || '#',
     free: beach.free || false,
     price: beach.free ? null : 'Day-use fee',
-    ages: 'All ages',
+    ages: '', // beaches show no age chip
     city: beach.city,
     fullAddress: beach.fullAddress,
     area: beach.city || 'Bay Area',
