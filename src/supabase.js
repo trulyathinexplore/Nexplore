@@ -1,3 +1,5 @@
+import { BEACHES } from './beachData.js'
+
 const SUPABASE_URL = 'https://kgythyenzjmnrzrlxynj.supabase.co'
 const SUPABASE_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtneXRoeWVuemptbnJ6cmx4eW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzOTY0MzUsImV4cCI6MjA5NDk3MjQzNX0.6qtAjUDmVlOUOTbbfr-YTU3AtsJ172lnBaIL9XlJ-Ys'
@@ -14,7 +16,13 @@ const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,
   if (freeOnly) url += '&is_free=eq.true'
   const res = await fetch(url, { headers })
   if (!res.ok) throw new Error(`Supabase error: ${res.status}`)
-  return res.json()
+  const events = await res.json()
+
+  // Merge with local beach data
+  const mappedBeaches = BEACHES.map(mapBeach)
+  const filtered = freeOnly ? mappedBeaches.filter(b => b.free) : mappedBeaches
+
+  return [...events, ...filtered]
 }
 
 export function mapEvent(e) {
@@ -59,6 +67,34 @@ export function mapEvent(e) {
     seasonalType: e.seasonal_type || null,
     category: e.categories?.name || null,
     tags: (e.event_tags || []).map((et) => et.tags).filter(Boolean),
+  }
+}
+
+// Map beach data to event format
+export function mapBeach(beach) {
+  return {
+    id: beach.id,
+    title: beach.title,
+    description: beach.description || '',
+    imageUrl: beach.image || null,
+    officialUrl: beach.officialUrl || '#',
+    free: beach.free || false,
+    price: beach.free ? null : 'Day-use fee',
+    ages: 'All ages',
+    city: beach.city,
+    fullAddress: beach.fullAddress,
+    area: beach.city || 'Bay Area',
+    startDate: null,
+    endDate: null,
+    dayLabel: '',
+    timeLabel: '',
+    isEditorPick: beach.isEditorPick || false,
+    eventType: beach.eventType || 'beach',
+    contentType: '',
+    seriesName: '',
+    seasonalType: null,
+    category: beach.category || 'Beach',
+    tags: beach.tags || [],
   }
 }
 

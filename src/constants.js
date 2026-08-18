@@ -13,14 +13,16 @@ export const PILLS = [
   { label: 'Events',        type: 'eventType', value: 'event' },
   { label: 'Zoo & Aquarium', type: 'category', value: ['Zoo', 'Aquarium']},
   { label: 'Museum',        type: 'category',  value: 'Museum' },
+  { label: 'Beaches',       type: 'category',  value: 'Beach',
+    fixedAmenities: ['tidepool', 'parking-onsite', 'restrooms', 'wheelchair-accessible', 'free'] },
 ]
 export const REGIONS = ['San Francisco', 'East Bay', 'South Bay', 'Peninsula', 'North Bay', 'Tri-Valley']
 export const REGION_CITIES = {
   'San Francisco': ['San Francisco'],
   'East Bay':      ['Oakland', 'Berkeley', 'Hayward', 'San Leandro', 'Fremont', 'Alameda', 'Richmond'],
-  'South Bay':     ['San Jose', 'Santa Clara', 'Sunnyvale', 'Mountain View', 'Palo Alto', 'Cupertino', 'Milpitas'],
-  'Peninsula':     ['San Mateo', 'Redwood City', 'Burlingame', 'South San Francisco', 'Daly City', 'Millbrae'],
-  'North Bay':     ['Mill Valley', 'San Rafael', 'Novato', 'Sausalito', 'Tiburon'],
+  'South Bay':     ['San Jose', 'Santa Clara', 'Sunnyvale', 'Mountain View', 'Palo Alto', 'Cupertino', 'Milpitas', 'Aptos', 'Santa Cruz'],
+  'Peninsula':     ['San Mateo', 'Redwood City', 'Burlingame', 'South San Francisco', 'Daly City', 'Millbrae', 'Half Moon Bay', 'Moss Beach', 'San Gregorio', 'Pescadero'],
+  'North Bay':     ['Mill Valley', 'San Rafael', 'Novato', 'Sausalito', 'Tiburon', 'Pacific Grove'],
   'Tri-Valley':    ['Dublin', 'Pleasanton', 'Livermore', 'San Ramon', 'Danville', 'Walnut Creek'],
 }
 // All cities across all regions (for location search matching)
@@ -38,6 +40,11 @@ export const KEYWORD_PILL_MAP = {
   'County Fairs': [
     'county fair', 'county fairs', 'fair', 'fairs',
     'summer fair', 'carnival', 'carnival rides',
+  ],
+  'Beaches': [
+    'tidepool', 'tide pool', 'tide pools', 'tidepooling', 'tide pooling',
+    'starfish', 'beach', 'beaches', 'marine life', 'sea creatures',
+    'intertidal', 'rocky shore', 'coastal exploration',
   ],
 }
 // Given a search string, return the pill label it maps to (or null)
