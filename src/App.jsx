@@ -10,7 +10,22 @@ import {
 const PILL_LABELS = PILLS.map((p) => p.label)
 const REGION_LABELS = Object.keys(REGION_CITIES)
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
+const NOW = new Date()
+const CURRENT_MONTH = NOW.getMonth()
+const CURRENT_YEAR = NOW.getFullYear()
+const CURRENT_MONTH_NAME = NOW.toLocaleString('en-US', { month: 'long' })
 
+// True when the event overlaps the current calendar month at all, so a run that
+// starts in July and ends in August still shows under the August chip.
+function isInCurrentMonth(startStr, endStr) {
+  const monthStart = new Date(CURRENT_YEAR, CURRENT_MONTH, 1, 0, 0, 0, 0)
+  const monthEnd = new Date(CURRENT_YEAR, CURRENT_MONTH + 1, 0, 23, 59, 59, 999)
+  const start = new Date(startStr + 'T12:00:00')
+  if (Number.isNaN(start.getTime())) return false
+  const parsedEnd = endStr ? new Date(endStr + 'T12:00:00') : start
+  const end = Number.isNaN(parsedEnd.getTime()) ? start : parsedEnd
+  return start <= monthEnd && end >= monthStart
+}
 function isThisWeekend(dateStr) {
   const d = new Date(dateStr + 'T12:00:00')
   const now = new Date(); now.setHours(0, 0, 0, 0)
@@ -136,7 +151,7 @@ export default function App() {
     if (searchDetectedPill && activePill.type !== 'all' && !matchesPill(ev, activePill)) return false
 
     if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
-    if (month && ev.startDate && new Date(ev.startDate + 'T12:00:00').getMonth() !== 5) return false
+   if (month && ev.startDate && !isInCurrentMonth(ev.startDate, ev.endDate)) return false
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
     return true
   }
@@ -181,7 +196,7 @@ export default function App() {
   }
 
   const chips = [
-    { label: '🗓 June', active: month, toggle: toggleMonth },
+    { label: `🗓 ${CURRENT_MONTH_NAME}`, active: month, toggle: toggleMonth },
     { label: '📅 This weekend', active: weekend, toggle: toggleWeekend },
     { label: '🏷 Free only', active: freeOnly, toggle: toggleFreeOnly },
   ]
