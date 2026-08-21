@@ -12,7 +12,7 @@ const headers = {
 // Embed category name + tags + venue (for city/address) so pills/amenities can filter on them.
 export async function fetchEvents({ freeOnly = false } = {}) {
 const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,address,city,state)'
-  let url = `${SUPABASE_URL}/rest/v1/events?select=${encodeURIComponent(select)}&order=start_date.asc`
+   let url = `${SUPABASE_URL}/rest/v1/events?select=${encodeURIComponent(select)}&status=eq.published&order=start_date.asc`
   if (freeOnly) url += '&is_free=eq.true'
   const res = await fetch(url, { headers })
   if (!res.ok) throw new Error(`Supabase error: ${res.status}`)
