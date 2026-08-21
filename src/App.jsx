@@ -4,12 +4,28 @@ import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFrom
 import { trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch, trackPageEngagement, trackJuly4thFilter } from './analytics.js'
 import { readFilters, writeFilters } from './urlState.js'
 import {
-  SearchIcon, FilterIcon, EventCard, EventCardSkeleton, PicksRow, FilterDrawer,
+  SearchIcon, FilterIcon, EventCard, EventCardSkeleton,  FilterDrawer,
 } from './components/ui.jsx'
 
 const PILL_LABELS = PILLS.map((p) => p.label)
 const REGION_LABELS = Object.keys(REGION_CITIES)
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
+const NOW = new Date()
+const CURRENT_MONTH = NOW.getMonth()
+const CURRENT_YEAR = NOW.getFullYear()
+const CURRENT_MONTH_NAME = NOW.toLocaleString('en-US', { month: 'long' })
+
+// True when the event overlaps the current calendar month at all, so a run that
+// starts in July and ends in August still shows under the August chip.
+function isInCurrentMonth(startStr, endStr) {
+  const monthStart = new Date(CURRENT_YEAR, CURRENT_MONTH, 1, 0, 0, 0, 0)
+  const monthEnd = new Date(CURRENT_YEAR, CURRENT_MONTH + 1, 0, 23, 59, 59, 999)
+  const start = new Date(startStr + 'T12:00:00')
+  if (Number.isNaN(start.getTime())) return false
+  const parsedEnd = endStr ? new Date(endStr + 'T12:00:00') : start
+  const end = Number.isNaN(parsedEnd.getTime()) ? start : parsedEnd
+  return start <= monthEnd && end >= monthStart
+}
 const NOW = new Date()
 const CURRENT_MONTH = NOW.getMonth()
 const CURRENT_YEAR = NOW.getFullYear()
@@ -181,7 +197,7 @@ export default function App() {
   const now = new Date()
   const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
   const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
-  const picks = upcoming.filter((ev) => ev.isEditorPick)
+
   const filterCount = [month, weekend, freeOnly, !!region].filter(Boolean).length + amenities.length
 
   // Click-through handlers with tracking
@@ -269,7 +285,7 @@ export default function App() {
         <div style={{ margin: '0 16px 10px', padding: '10px 14px', borderRadius: 10, background: '#FEF0E6', border: '0.5px solid #C94F2C', fontSize: 12, color: '#C94F2C' }}>⚠️ {error}</div>
       )}
 
-      {!loading && <PicksRow picks={picks} onSelect={openOfficial} />}
+     
 
       {/* Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px' }}>
