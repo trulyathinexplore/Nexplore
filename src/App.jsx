@@ -25,7 +25,6 @@ function isInCurrentMonth(startStr, endStr) {
   const parsedEnd = endStr ? new Date(endStr + 'T12:00:00') : start
   const end = Number.isNaN(parsedEnd.getTime()) ? start : parsedEnd
   return start <= monthEnd && end >= monthStart
-}
 
 }
 function isThisWeekend(dateStr) {
