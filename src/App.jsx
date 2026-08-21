@@ -26,21 +26,7 @@ function isInCurrentMonth(startStr, endStr) {
   const end = Number.isNaN(parsedEnd.getTime()) ? start : parsedEnd
   return start <= monthEnd && end >= monthStart
 }
-const NOW = new Date()
-const CURRENT_MONTH = NOW.getMonth()
-const CURRENT_YEAR = NOW.getFullYear()
-const CURRENT_MONTH_NAME = NOW.toLocaleString('en-US', { month: 'long' })
 
-// True when the event overlaps the current calendar month at all, so a run that
-// starts in July and ends in August still shows under the August chip.
-function isInCurrentMonth(startStr, endStr) {
-  const monthStart = new Date(CURRENT_YEAR, CURRENT_MONTH, 1, 0, 0, 0, 0)
-  const monthEnd = new Date(CURRENT_YEAR, CURRENT_MONTH + 1, 0, 23, 59, 59, 999)
-  const start = new Date(startStr + 'T12:00:00')
-  if (Number.isNaN(start.getTime())) return false
-  const parsedEnd = endStr ? new Date(endStr + 'T12:00:00') : start
-  const end = Number.isNaN(parsedEnd.getTime()) ? start : parsedEnd
-  return start <= monthEnd && end >= monthStart
 }
 function isThisWeekend(dateStr) {
   const d = new Date(dateStr + 'T12:00:00')
@@ -278,7 +264,7 @@ export default function App() {
 
       {/* Count */}
       <div style={{ fontSize: 9, fontWeight: 700, color: '#888880', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '9px 16px 6px' }}>
-        {loading ? 'Loading...' : `${upcoming.length} thing${upcoming.length !== 1 ? 's' : ''} to do${month ? ' in June' : ''}`}
+        {loading ? 'Loading...' : `${upcoming.length} thing${upcoming.length !== 1 ? 's' : ''} to do`}
       </div>
 
       {error && (
