@@ -94,8 +94,11 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
   // Show city name if available, otherwise fall back to area
   const locationLabel = event.city || event.area || 'Bay Area'
 
-  // Format date range for multi-day events
+  // Format date range for multi-day events.
+  // An explicit "Day display label" from the admin ("Sep 1, 5, 10", "Every
+  // Saturday") always wins — it exists for dates a start/end range can't express.
   const formatDateRange = () => {
+    if (event.dayLabelRaw) return event.dayLabelRaw
     if (!event.startDate) return event.dayLabel || ''
     const start = new Date(event.startDate + 'T12:00:00')
     const end = new Date(event.endDate + 'T12:00:00')
