@@ -40,14 +40,13 @@ function isThisWeekend(dateStr) {
 // the Jan chip shown in November means Jan of NEXT year, not this one.
 function monthKey(year, month) {
   return `${year}-${month}`
-}
 function isInMonth(startStr, key) {
   if (!startStr) return false
-  const start = new Date(startStr + 'T12:00:00')
+  const [year, month, day] = startStr.split('-').map(Number)
+  const start = new Date(Date.UTC(year, month - 1, day))
   if (Number.isNaN(start.getTime())) return false
-  return monthKey(start.getFullYear(), start.getMonth() + 1) === key
+  return monthKey(start.getUTCFullYear(), start.getUTCMonth() + 1) === key
 }
-
 export default function App() {
   const init = readFilters(window.location.search, PILL_LABELS, REGION_LABELS)
   const [events, setEvents] = useState([])
