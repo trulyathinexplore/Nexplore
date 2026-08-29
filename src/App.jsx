@@ -53,6 +53,28 @@ export default function App() {
   const [search, setSearch] = useState(init.q)
   const [amenities, setAmenities] = useState(init.amenities)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  
+// Calculate current and next 2 months dynamically
+const getCurrentAndNextMonths = () => {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  
+  const months = [];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  for (let i = 0; i < 3; i++) {
+    const monthIndex = (currentMonth + i) % 12;
+    const year = currentYear + Math.floor((currentMonth + i) / 12);
+     months.push({
+      label: monthNames[monthIndex],
+      month: monthIndex + 1, // 1-12
+      year: year
+    });
+  }
+  return months;
+};
 
   useEffect(() => {
     let cancelled = false
