@@ -75,6 +75,7 @@ const getCurrentAndNextMonths = () => {
   }
   return months;
 };
+  const monthFilters = getCurrentAndNextMonths();
 
   useEffect(() => {
     let cancelled = false
