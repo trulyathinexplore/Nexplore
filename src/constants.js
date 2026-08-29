@@ -1,4 +1,5 @@
 
+Constants · JS
 // Pill config - each pill declares HOW it filters.
 // type: 'all' | 'category' | 'tagGroup' | 'eventType' | 'seasonalType'
 // fixedAmenities (optional): a curated, always-shown sub-list. If absent,
@@ -195,6 +196,59 @@ export const AMENITIES = {
 export const cardBg = (id) => {
   const colors = ['#FFE8D6', '#E8F5EE', '#FFF4E6', '#E8F0FF', '#F5E8FF', '#FFE8F0', '#E8FFED', '#FFE8E8'];
   return colors[id % colors.length];
+};
+ 
+// Tags to exclude from amenity display
+export const EXCLUDED_AMENITY_TAGS = [
+  'family-friendly',
+  'kid-friendly',
+  'indoor',
+  'outdoor'
+];
+ 
+// Detect if search text maps to a pill via KEYWORD_PILL_MAP
+export const detectPillFromSearch = (search) => {
+  if (!search) return null
+  const lower = search.toLowerCase()
+  for (const [pillLabel, keywords] of Object.entries(KEYWORD_PILL_MAP)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      return pillLabel
+    }
+  }
+  return null
+};
+ 
+// Detect if search text mentions a city from REGION_CITIES
+export const detectCityFromSearch = (search) => {
+  if (!search) return null
+  const lower = search.toLowerCase()
+  for (const city of Object.keys(REGION_CITIES)) {
+    if (lower.includes(city.toLowerCase())) {
+      return city
+    }
+  }
+  return null
+};
+ 
+// Check if an event matches a pill's filter criteria
+export const matchesPill = (event, pill) => {
+  if (pill.type === 'all') return true
+  if (pill.type === 'category') {
+    if (Array.isArray(pill.value)) {
+      return pill.value.includes(event.category)
+    }
+    return event.category === pill.value
+  }
+  if (pill.type === 'tagGroup') {
+    return event.tags && event.tags.some(tag => tag.tag_group === pill.value)
+  }
+  if (pill.type === 'eventType') {
+    return event.event_type === pill.value
+  }
+  if (pill.type === 'seasonalType') {
+    return event.seasonal_type === pill.value
+  }
+  return false
 };
  
 
