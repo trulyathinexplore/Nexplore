@@ -1,5 +1,6 @@
-import { BEACHES } from './beachData.js'
 
+import { BEACHES } from './beachData.js'
+ 
 const SUPABASE_URL = 'https://kgythyenzjmnrzrlxynj.supabase.co'
 const SUPABASE_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtneXRoeWVuemptbnJ6cmx4eW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzOTY0MzUsImV4cCI6MjA5NDk3MjQzNX0.6qtAjUDmVlOUOTbbfr-YTU3AtsJ172lnBaIL9XlJ-Ys'
@@ -8,7 +9,7 @@ const headers = {
   Authorization: `Bearer ${SUPABASE_ANON}`,
   'Content-Type': 'application/json',
 }
-
+ 
 // Embed category name + tags + venue (for city/address) so pills/amenities can filter on them.
 export async function fetchEvents({ freeOnly = false } = {}) {
 const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,address,city,state)'
@@ -17,37 +18,37 @@ const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,
   const res = await fetch(url, { headers })
   if (!res.ok) throw new Error(`Supabase error: ${res.status}`)
   const events = await res.json()
-
+ 
   // Merge with local beach data
   const mappedBeaches = BEACHES.map(mapBeach)
   const filtered = freeOnly ? mappedBeaches.filter(b => b.free) : mappedBeaches
-
+ 
   return [...events, ...filtered]
 }
-
+ 
 export function mapEvent(e) {
   // Beaches arrive already in app shape (see mapBeach) — passing them through
   // mapEvent a second time would strip category/tags, so short-circuit here.
   if (e && e.__isBeach) return e
-
+ 
   // Prefer venue city over event-level city field
   const venueCity = e.venues?.city || ''
   const venueAddress = e.venues?.address || ''
   const venueState = e.venues?.state || ''
   const city = venueCity || e.city || ''
-
+ 
   // Full address for Google Maps directions
   const fullAddress = venueAddress && venueCity
     ? `${venueAddress}, ${venueCity}, ${venueState || 'CA'}`
     : city || 'Bay Area, CA'
-
+ 
   let dayLabel = e.day_label || ''
   if (!dayLabel && e.start_date) {
     dayLabel = new Date(e.start_date + 'T12:00:00')
       .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
       .toUpperCase()
   }
-
+ 
   return {
     id: e.id,
     title: e.title,
@@ -63,6 +64,8 @@ export function mapEvent(e) {
     startDate: e.start_date,
     endDate: e.end_date,
     dayLabel,
+    // Raw admin-entered day_label (null when derived) — EventCard prefers it.
+    dayLabelRaw: e.day_label || null,
     timeLabel: e.time_label || '',
     isEditorPick: e.is_editor_pick || e.featured || false,
     eventType: e.event_type || e.content_type || 'event',
@@ -73,7 +76,7 @@ export function mapEvent(e) {
     tags: (e.event_tags || []).map((et) => et.tags).filter(Boolean),
   }
 }
-
+ 
 // Map beach data to event format
 export function mapBeach(beach) {
   return {
@@ -92,6 +95,7 @@ export function mapBeach(beach) {
     startDate: null,
     endDate: null,
     dayLabel: '',
+    dayLabelRaw: null,
     timeLabel: '',
     isEditorPick: beach.isEditorPick || false,
     eventType: beach.eventType || 'beach',
@@ -102,7 +106,7 @@ export function mapBeach(beach) {
     tags: beach.tags || [],
   }
 }
-
+ 
 // Microlink image resolution with in-memory cache + write-back to Supabase
 const imgCache = {}
 export async function resolveImage(officialUrl, id) {
@@ -125,3 +129,6 @@ export async function resolveImage(officialUrl, id) {
     return null
   }
 }
+ 
+
+Downloaded ui_2.jsx Show in Finder
