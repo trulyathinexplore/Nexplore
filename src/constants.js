@@ -1,5 +1,3 @@
-
-```javascript
 // Pill config - each pill declares HOW it filters.
 // type: 'all' | 'category' | 'tagGroup' | 'eventType' | 'seasonalType'
 // fixedAmenities (optional): a curated, always-shown sub-list. If absent,
