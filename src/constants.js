@@ -191,26 +191,3 @@ export const AMENITIES = {
     emoji: '🌅'
   }
 };
-```
-
----
-
-## Step 5: Commit the Changes
-
-Scroll down and you'll see a "Commit changes" section at the bottom:
-- **Commit message**: Type: `Update: Reorder pills, add Pumpkin Patches, hide July 4th`
-- **Description** (optional): Add month filter support
-- Click "Commit changes"
-
-## Done! ✅
-
-Your constants.js file is now updated with:
-- ✅ Pills reordered: All → Playground → Events → Water Play → County Fairs → Pumpkin Patches → Zoo & Aquarium → Museum
-- ✅ July 4th commented out (content preserved)
-- ✅ Pumpkin Patches category added
-
----
-
-## Next: Update App.jsx for Month Filters
-
-After this, you'll need to update **App.jsx** with the month filter logic. I can provide those changes separately or you can implement them step-by-step following the detailed guide I provided earlier.
