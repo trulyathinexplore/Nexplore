@@ -36,12 +36,16 @@ function isThisWeekend(dateStr) {
   return d >= sat && d <= sun
 }
 
-// Check if event is in a specific month (1-12)
-function isInMonth(startStr, monthNumber) {
+// Check if an event falls in a specific month, keyed as "YYYY-M" so that
+// the Jan chip shown in November means Jan of NEXT year, not this one.
+function monthKey(year, month) {
+  return `${year}-${month}`
+}
+function isInMonth(startStr, key) {
   if (!startStr) return false
   const start = new Date(startStr + 'T12:00:00')
   if (Number.isNaN(start.getTime())) return false
-  return (start.getMonth() + 1) === monthNumber
+  return monthKey(start.getFullYear(), start.getMonth() + 1) === key
 }
 
 export default function App() {
@@ -74,8 +78,7 @@ export default function App() {
       const year = currentYear + Math.floor((currentMonth + i) / 12);
       months.push({
         label: monthNames[monthIndex],
-        month: monthIndex + 1, // 1-12
-        year: year
+        key: monthKey(year, monthIndex + 1),
       });
     }
     return months;
@@ -282,19 +285,19 @@ export default function App() {
         <div style={{ display: 'flex', gap: 6, padding: '7px 16px 9px', borderBottom: '0.5px solid #E2DDD6', overflowX: 'auto' }}>
           {monthFilters.map((monthFilter, idx) => (
             <div
-              key={idx}
+              key={monthFilter.key}
               onClick={() => setSelectedMonthFilter(
-                selectedMonthFilter === monthFilter.month ? null : monthFilter.month
+                selectedMonthFilter === monthFilter.key ? null : monthFilter.key
               )}
               style={{
                 flexShrink: 0,
                 fontSize: 10,
-                fontWeight: selectedMonthFilter === monthFilter.month ? 600 : 500,
+                fontWeight: selectedMonthFilter === monthFilter.key ? 600 : 500,
                 padding: '3px 10px',
                 borderRadius: 20,
-                border: `0.5px solid ${selectedMonthFilter === monthFilter.month ? '#1A6B4A' : '#E2DDD6'}`,
-                color: selectedMonthFilter === monthFilter.month ? '#1A6B4A' : '#888880',
-                background: selectedMonthFilter === monthFilter.month ? '#E8F5EE' : 'white',
+                border: `0.5px solid ${selectedMonthFilter === monthFilter.key ? '#1A6B4A' : '#E2DDD6'}`,
+                color: selectedMonthFilter === monthFilter.key ? '#1A6B4A' : '#888880',
+                background: selectedMonthFilter === monthFilter.key ? '#E8F5EE' : 'white',
                 cursor: 'pointer'
               }}
             >
