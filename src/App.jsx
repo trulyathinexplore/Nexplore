@@ -6,7 +6,6 @@ import { readFilters, writeFilters } from './urlState.js'
 import {
   SearchIcon, FilterIcon, EventCard, EventCardSkeleton,  FilterDrawer,
 } from './components/ui.jsx'
-
 const PILL_LABELS = PILLS.map((p) => p.label)
 const REGION_LABELS = Object.keys(REGION_CITIES)
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
@@ -14,7 +13,6 @@ const NOW = new Date()
 const CURRENT_MONTH = NOW.getMonth()
 const CURRENT_YEAR = NOW.getFullYear()
 const CURRENT_MONTH_NAME = NOW.toLocaleString('en-US', { month: 'long' })
-
 // True when the event overlaps the current calendar month at all, so a run that
 // starts in July and ends in August still shows under the August chip.
 function isInCurrentMonth(startStr, endStr) {
@@ -25,7 +23,6 @@ function isInCurrentMonth(startStr, endStr) {
   const parsedEnd = endStr ? new Date(endStr + 'T12:00:00') : start
   const end = Number.isNaN(parsedEnd.getTime()) ? start : parsedEnd
   return start <= monthEnd && end >= monthStart
-
 }
 function isThisWeekend(dateStr) {
   const d = new Date(dateStr + 'T12:00:00')
@@ -39,9 +36,16 @@ function isThisWeekend(dateStr) {
   return d >= sat && d <= sun
 }
 
+// Check if event is in a specific month (1-12)
+function isInMonth(startStr, monthNumber) {
+  if (!startStr) return false
+  const start = new Date(startStr + 'T12:00:00')
+  if (Number.isNaN(start.getTime())) return false
+  return (start.getMonth() + 1) === monthNumber
+}
+
 export default function App() {
   const init = readFilters(window.location.search, PILL_LABELS, REGION_LABELS)
-
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -53,28 +57,30 @@ export default function App() {
   const [search, setSearch] = useState(init.q)
   const [amenities, setAmenities] = useState(init.amenities)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  
-// Calculate current and next 2 months dynamically
-const getCurrentAndNextMonths = () => {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  
-  const months = [];
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                      'July', 'August', 'September', 'October', 'November', 'December'];
-  
-  for (let i = 0; i < 3; i++) {
-    const monthIndex = (currentMonth + i) % 12;
-    const year = currentYear + Math.floor((currentMonth + i) / 12);
-     months.push({
-      label: monthNames[monthIndex],
-      month: monthIndex + 1, // 1-12
-      year: year
-    });
-  }
-  return months;
-};
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState(null)
+
+  // Calculate current and next 2 months dynamically
+  const getCurrentAndNextMonths = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const months = [];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+
+    for (let i = 0; i < 3; i++) {
+      const monthIndex = (currentMonth + i) % 12;
+      const year = currentYear + Math.floor((currentMonth + i) / 12);
+      months.push({
+        label: monthNames[monthIndex],
+        month: monthIndex + 1, // 1-12
+        year: year
+      });
+    }
+    return months;
+  };
+
   const monthFilters = getCurrentAndNextMonths();
 
   useEffect(() => {
@@ -102,7 +108,6 @@ const getCurrentAndNextMonths = () => {
 
   const activePill = PILLS.find((p) => p.label === pill) || PILLS[0]
   const showAmenities = activePill.type === 'category' || activePill.type === 'tagGroup'
-
   // Only show date/time chips when Events pill is active
   const showDateChips = activePill.type === 'eventType'
 
@@ -117,7 +122,7 @@ const getCurrentAndNextMonths = () => {
     const ap = PILLS.find((p) => p.label === label)
     if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
     // Auto-deactivate month filter when leaving Events pill
-    if (ap.type !== 'eventType') setMonth(false)
+    if (ap.type !== 'eventType') setSelectedMonthFilter(null)
   }
 
   const toggleAmenity = (name) =>
@@ -134,10 +139,12 @@ const getCurrentAndNextMonths = () => {
     setFreeOnly((v) => !v)
     trackFilterApplied('free_only', !freeOnly ? 'enabled' : 'disabled')
   }
+
   const toggleWeekend = () => {
     setWeekend((v) => !v)
     trackFilterApplied('weekend', !weekend ? 'enabled' : 'disabled')
   }
+
   const toggleMonth = () => {
     setMonth((v) => !v)
     trackFilterApplied('month', !month ? 'enabled' : 'disabled')
@@ -150,7 +157,6 @@ const getCurrentAndNextMonths = () => {
   const passesBase = (ev) => {
     if (search) {
       const s = search.toLowerCase()
-
       // If search maps to a pill (e.g. "splash pad" to Water Play), use that pill logic
       if (searchDetectedPill) {
         const mappedPill = PILLS.find((p) => p.label === searchDetectedPill)
@@ -162,21 +168,20 @@ const getCurrentAndNextMonths = () => {
           !(ev.description || '').toLowerCase().includes(s)
         ) return false
       }
-
       // Location filter: if city detected in search, filter by city
       if (searchDetectedCity) {
         if ((ev.city || '').toLowerCase() !== searchDetectedCity.toLowerCase()) return false
       }
     }
-
     // If no search keyword mapping, apply active pill normally
     if (!searchDetectedPill && !matchesPill(ev, activePill)) return false
     // If keyword mapped to a pill but user also has a pill selected (not All), still apply it
     if (searchDetectedPill && activePill.type !== 'all' && !matchesPill(ev, activePill)) return false
-
     if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
-   if (month && ev.startDate && !isInCurrentMonth(ev.startDate, ev.endDate)) return false
+    if (month && ev.startDate && !isInCurrentMonth(ev.startDate, ev.endDate)) return false
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
+    // NEW: Month filter based on selectedMonthFilter
+    if (selectedMonthFilter && ev.startDate && !isInMonth(ev.startDate, selectedMonthFilter)) return false
     return true
   }
 
@@ -202,17 +207,19 @@ const getCurrentAndNextMonths = () => {
   const filtered = base.filter((ev) =>
     amenities.every((a) => (a === 'free' ? ev.free === true : ev.tags.some((t) => t.name === a)))
   )
+
   const now = new Date()
   const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
   const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
 
-  const filterCount = [month, weekend, freeOnly, !!region].filter(Boolean).length + amenities.length
+  const filterCount = [month, weekend, freeOnly, !!region, !!selectedMonthFilter].filter(Boolean).length + amenities.length
 
   // Click-through handlers with tracking
   const openOfficial = (ev) => {
     trackEventClickThrough(ev.title, 'learn_more')
     if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank')
   }
+
   const openDirections = (ev) => {
     trackEventClickThrough(ev.title, 'directions')
     const q = encodeURIComponent(ev.fullAddress || ev.title)
@@ -270,10 +277,32 @@ const getCurrentAndNextMonths = () => {
         </div>
       )}
 
-      {/* Date/time chips — ONLY when Events pill is active */}
+      {/* Month Filters - Dynamic Current + Next 2 Months (UPDATED) */}
       {showDateChips && (
         <div style={{ display: 'flex', gap: 6, padding: '7px 16px 9px', borderBottom: '0.5px solid #E2DDD6', overflowX: 'auto' }}>
-          {chips.map(({ label, active, toggle }) => (
+          {monthFilters.map((monthFilter, idx) => (
+            <div
+              key={idx}
+              onClick={() => setSelectedMonthFilter(
+                selectedMonthFilter === monthFilter.month ? null : monthFilter.month
+              )}
+              style={{
+                flexShrink: 0,
+                fontSize: 10,
+                fontWeight: selectedMonthFilter === monthFilter.month ? 600 : 500,
+                padding: '3px 10px',
+                borderRadius: 20,
+                border: `0.5px solid ${selectedMonthFilter === monthFilter.month ? '#1A6B4A' : '#E2DDD6'}`,
+                color: selectedMonthFilter === monthFilter.month ? '#1A6B4A' : '#888880',
+                background: selectedMonthFilter === monthFilter.month ? '#E8F5EE' : 'white',
+                cursor: 'pointer'
+              }}
+            >
+              📅 {monthFilter.label}
+            </div>
+          ))}
+          {/* Keep This weekend and Free only chips */}
+          {chips.slice(1).map(({ label, active, toggle }) => (
             <div key={label} onClick={toggle} style={{ flexShrink: 0, fontSize: 10, fontWeight: active ? 600 : 500, padding: '3px 10px', borderRadius: 20, border: `0.5px solid ${active ? '#1A6B4A' : '#E2DDD6'}`, color: active ? '#1A6B4A' : '#888880', background: active ? '#E8F5EE' : 'white', cursor: 'pointer' }}>{label}</div>
           ))}
         </div>
@@ -292,8 +321,6 @@ const getCurrentAndNextMonths = () => {
       {error && (
         <div style={{ margin: '0 16px 10px', padding: '10px 14px', borderRadius: 10, background: '#FEF0E6', border: '0.5px solid #C94F2C', fontSize: 12, color: '#C94F2C' }}>⚠️ {error}</div>
       )}
-
-     
 
       {/* Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px' }}>
@@ -338,9 +365,7 @@ const getCurrentAndNextMonths = () => {
           </div>
         )
       )}
-
       <div style={{ height: 32 }} />
-
       <FilterDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} region={region} setRegion={setRegion} freeOnly={freeOnly} setFreeOnly={setFreeOnly} />
     </div>
   )
