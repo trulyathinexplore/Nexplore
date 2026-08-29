@@ -1,8 +1,9 @@
+
 // Pill config - each pill declares HOW it filters.
 // type: 'all' | 'category' | 'tagGroup' | 'eventType' | 'seasonalType'
 // fixedAmenities (optional): a curated, always-shown sub-list. If absent,
 // they're built dynamically from whatever tags exist on matching events (unchanged default behavior).
-
+ 
 export const PILLS = [
   { label: 'All', type: 'all' },
   { label: 'Playground', type: 'category', value: 'Playground', fixedAmenities: ['free', 'parking-onsite', 'picnic-area', 'wheelchair-accessible'] },
@@ -15,7 +16,7 @@ export const PILLS = [
   // Commented out - keeping content for next year
   // { label: 'July 4th', type: 'seasonalType', value: 'july-4th' },
 ];
-
+ 
 // Map user search keywords to pill labels.
 // When the user types a keyword, we find the pill and select it.
 export const KEYWORD_PILL_MAP = {
@@ -53,7 +54,7 @@ export const KEYWORD_PILL_MAP = {
     'workshop', 'class', 'activity'
   ]
 };
-
+ 
 // Regions for UI display and search - each region maps to multiple cities.
 // Search hits with a city in 'SF Bay Area', 'Peninsula', etc. get tagged with the region.
 export const REGIONS = {
@@ -78,7 +79,7 @@ export const REGIONS = {
     'San Rafael', 'Marin County', 'Sausalito', 'Mill Valley', 'Novato'
   ]
 };
-
+ 
 // Region city mappings (for search and display)
 export const REGION_CITIES = {
   'San Francisco': 'SF Bay Area',
@@ -139,7 +140,7 @@ export const REGION_CITIES = {
   'Mill Valley': 'North Bay',
   'Novato': 'North Bay'
 };
-
+ 
 // Amenity config - display name, description, icon emoji.
 // Used by FilterIcon to build the sub-pill row.
 export const AMENITIES = {
@@ -189,3 +190,11 @@ export const AMENITIES = {
     emoji: '🌅'
   }
 };
+ 
+// Card background color generator for event cards
+export const cardBg = (id) => {
+  const colors = ['#FFE8D6', '#E8F5EE', '#FFF4E6', '#E8F0FF', '#F5E8FF', '#FFE8F0', '#E8FFED', '#FFE8E8'];
+  return colors[id % colors.length];
+};
+ 
+
