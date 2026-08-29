@@ -192,7 +192,7 @@ export default function App() {
     // If keyword mapped to a pill but user also has a pill selected (not All), still apply it
     if (searchDetectedPill && activePill.type !== 'all' && !matchesPill(ev, activePill)) return false
     if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
-    if (month && ev.startDate && !isInCurrentMonth(ev.startDate, ev.endDate)) return false
+
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
     // NEW: Month filter based on selectedMonthFilter
     if (selectedMonthFilter && ev.startDate && !isInMonth(ev.startDate, selectedMonthFilter)) return false
@@ -226,7 +226,7 @@ export default function App() {
   const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
   const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
 
-  const filterCount = [month, weekend, freeOnly, !!region, !!selectedMonthFilter].filter(Boolean).length + amenities.length
+ const filterCount = [weekend, freeOnly, !!region, !!selectedMonthFilter].filter(Boolean).length + amenities.length
 
   // Click-through handlers with tracking
   const openOfficial = (ev) => {
