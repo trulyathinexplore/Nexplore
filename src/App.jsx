@@ -16,11 +16,17 @@ const CURRENT_MONTH_NAME = NOW.toLocaleString('en-US', { month: 'long' })
 // True when the event overlaps the current calendar month at all, so a run that
 // starts in July and ends in August still shows under the August chip.
 function isInCurrentMonth(startStr, endStr) {
-  const monthStart = new Date(CURRENT_YEAR, CURRENT_MONTH, 1, 0, 0, 0, 0)
-  const monthEnd = new Date(CURRENT_YEAR, CURRENT_MONTH + 1, 0, 23, 59, 59, 999)
-  const start = new Date(startStr + 'T12:00:00')
-  if (Number.isNaN(start.getTime())) return false
-  const parsedEnd = endStr ? new Date(endStr + 'T12:00:00') : start
+  const [startYear, startMonth, startDay] = startStr.split('-').map(Number)
+  const start = new Date(Date.UTC(startYear, startMonth - 1, startDay))
+  
+  const monthStart = new Date(Date.UTC(CURRENT_YEAR, CURRENT_MONTH, 1, 0, 0, 0, 0))
+  const monthEnd = new Date(Date.UTC(CURRENT_YEAR, CURRENT_MONTH + 1, 0, 23, 59, 59, 999))
+  
+  const parsedEnd = endStr ? (() => {
+    const [endYear, endMonth, endDay] = endStr.split('-').map(Number)
+    return new Date(Date.UTC(endYear, endMonth - 1, endDay))
+  })() : start
+  
   const end = Number.isNaN(parsedEnd.getTime()) ? start : parsedEnd
   return start <= monthEnd && end >= monthStart
 }
@@ -142,10 +148,11 @@ export default function App() {
     trackFilterApplied('free_only', !freeOnly ? 'enabled' : 'disabled')
   }
 
-  const toggleWeekend = () => {
-    setWeekend((v) => !v)
-    trackFilterApplied('weekend', !weekend ? 'enabled' : 'disabled')
-  }
+const toggleWeekend = () => {
+  setWeekend((v) => !v)
+  setSelectedMonthFilter(null)  // ← Uncheck month when "This weekend" is clicked
+  trackFilterApplied('weekend', !weekend ? 'enabled' : 'disabled')
+}
 
   const toggleMonth = () => {
     setMonth((v) => !v)
@@ -285,9 +292,12 @@ export default function App() {
           {monthFilters.map((monthFilter, idx) => (
             <div
               key={monthFilter.key}
-              onClick={() => setSelectedMonthFilter(
-                selectedMonthFilter === monthFilter.key ? null : monthFilter.key
-              )}
+             onClick={() => {
+  setSelectedMonthFilter(
+    selectedMonthFilter === monthFilter.key ? null : monthFilter.key
+  )
+  setWeekend(false)  // ← Uncheck "This weekend" when month is selected
+}}
               style={{
                 flexShrink: 0,
                 fontSize: 10,
