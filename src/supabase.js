@@ -131,4 +131,4 @@ export async function resolveImage(officialUrl, id) {
 }
  
 
-Downloaded ui_2.jsx Show in Finder
+
