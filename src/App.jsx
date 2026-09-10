@@ -134,7 +134,7 @@ export default function App() {
       trackPillClick(label)
     }
     const ap = PILLS.find((p) => p.label === label)
-    if (!(ap.type === 'category' || ap.type === 'tagGroup')) setAmenities([])
+    if (!(ap.type === 'category' || ap.type === 'tagGroup' || ap.type === 'seasonalType')) setAmenities([])
     // Auto-deactivate month filter when leaving Events pill
     if (ap.type !== 'eventType') setSelectedMonthFilter(null)
   }
