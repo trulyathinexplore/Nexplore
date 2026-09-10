@@ -11,17 +11,12 @@ export const PILLS = [
   { label: 'Events',        type: 'eventType', value: 'event' },
   { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature',
     fixedAmenities: ['free', 'waterparks', 'splash-pad', 'swim-lakes', 'fountain'] },
-  {
-    label: 'Pumpkin Patches',
-    type: 'seasonalType',
-    value: 'halloween',
-    fixedAmenities: [
-      { id: 'dog-friendly', label: 'Dog Friendly', emoji: '🐕' },
-      { id: 'wheelchair-accessible', label: 'Accessible', emoji: '♿' },
-      { id: 'free', label: 'Free Admission', emoji: '💚' },
-      { id: 'rides-games', label: 'Rides & Games', emoji: '🎡' }
-    ]
-  },
+ {
+  label: 'Pumpkin Patches',
+  type: 'seasonalType',
+  value: 'halloween',
+  fixedAmenities: ['🐕 Dog Friendly', '♿ Accessible', '💚 Free Admission', '🎡 Rides & Games']
+},
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
   // Hidden for now — content preserved for next year. Uncomment to bring back.
   // { label: 'July 4th',      type: 'seasonalType', value: 'july-4th' },
