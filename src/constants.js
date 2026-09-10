@@ -21,7 +21,7 @@ export const PILLS = [
     { id: 'free', label: 'Free Admission', emoji: '💚' },
     { id: 'rides-games', label: 'Rides & Games', emoji: '🎡' }
   ]
-}
+},
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
   // Hidden for now — content preserved for next year. Uncomment to bring back.
   // { label: 'July 4th',      type: 'seasonalType', value: 'july-4th' },
