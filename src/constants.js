@@ -1,5 +1,5 @@
 
-
+import { extractAmenitiesFromDescription, filterByAmenities, getAmenityBadges } from './utils/amenityParser';
 // Pill config — each pill declares HOW it filters.
 // type: 'all' | 'eventType' | 'category' | 'tagGroup'
 // fixedAmenities (optional): a curated, always-shown sub-pill list. If absent,
@@ -11,8 +11,17 @@ export const PILLS = [
   { label: 'Events',        type: 'eventType', value: 'event' },
   { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature',
     fixedAmenities: ['free', 'waterparks', 'splash-pad', 'swim-lakes', 'fountain'] },
-  { label: 'Pumpkin Patches', type: 'category', value: 'Pumpkin Patch',
-    fixedAmenities: ['free', 'parking-onsite', 'restrooms'] },
+ {
+  label: 'Pumpkin Patches',
+  type: 'seasonalType',
+  value: 'halloween',
+  fixedAmenities: [
+    { id: 'dog-friendly', label: 'Dog Friendly', emoji: '🐕' },
+    { id: 'wheelchair-accessible', label: 'Accessible', emoji: '♿' },
+    { id: 'free', label: 'Free Admission', emoji: '💚' },
+    { id: 'rides-games', label: 'Rides & Games', emoji: '🎡' }
+  ]
+}
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
   // Hidden for now — content preserved for next year. Uncomment to bring back.
   // { label: 'July 4th',      type: 'seasonalType', value: 'july-4th' },
@@ -50,6 +59,10 @@ export const KEYWORD_PILL_MAP = {
     'pumpkin', 'pumpkins', 'pumpkin patch', 'pumpkin patches',
     'pumpkin picking', 'corn maze', 'hay ride', 'hayride',
     'fall harvest', 'harvest festival',
+    'pumpkin patch': PILLS[9], // or whatever index the pumpkin patch pill is
+'pumpkin patches': PILLS[9],
+'pumpkins': PILLS[9],
+'pumpkin picking': PILLS[9],
   ],
   'Beaches': [
     'tidepool', 'tide pool', 'tide pools', 'tidepooling', 'tide pooling',
