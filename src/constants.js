@@ -1,6 +1,5 @@
 
 
-import { extractAmenitiesFromDescription, filterByAmenities, getAmenityBadges } from './utils/amenityParser';
 // Pill config — each pill declares HOW it filters.
 // type: 'all' | 'eventType' | 'category' | 'tagGroup'
 // fixedAmenities (optional): a curated, always-shown sub-pill list. If absent,
