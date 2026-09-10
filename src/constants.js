@@ -1,7 +1,8 @@
 
-
+ 
+ 
 // Pill config — each pill declares HOW it filters.
-// type: 'all' | 'eventType' | 'category' | 'tagGroup'
+// type: 'all' | 'eventType' | 'category' | 'tagGroup' | 'seasonalType'
 // fixedAmenities (optional): a curated, always-shown sub-pill list. If absent,
 // sub-pills are computed dynamically from whatever tags exist on matching events (unchanged default behavior).
 export const PILLS = [
@@ -11,12 +12,12 @@ export const PILLS = [
   { label: 'Events',        type: 'eventType', value: 'event' },
   { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature',
     fixedAmenities: ['free', 'waterparks', 'splash-pad', 'swim-lakes', 'fountain'] },
- {
-  label: 'Pumpkin Patches',
-  type: 'seasonalType',
-  value: 'halloween',
-  fixedAmenities: ['🐕 Dog Friendly', '♿ Accessible', '💚 Free Admission', '🎡 Rides & Games']
-},
+  {
+    label: 'Pumpkin Patches',
+    type: 'seasonalType',
+    value: 'halloween',
+    fixedAmenities: ['dog-friendly', 'wheelchair-accessible', 'free', 'rides-games']
+  },
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
   // Hidden for now — content preserved for next year. Uncomment to bring back.
   // { label: 'July 4th',      type: 'seasonalType', value: 'july-4th' },
@@ -102,5 +103,38 @@ export function matchesPill(ev, pill) {
 // Sub-filter tags to always exclude from amenity pills
 export const EXCLUDED_AMENITY_TAGS = ['family-friendly', 'family friendly']
  
-
+// Amenity emoji mapping for pumpkin patches and description-based filters
+export const AMENITY_EMOJIS = {
+  'dog-friendly': '🐕',
+  'wheelchair-accessible': '♿',
+  'free': '💚',
+  'rides-games': '🎡'
+}
+ 
+export const AMENITY_LABELS = {
+  'dog-friendly': 'Dog Friendly',
+  'wheelchair-accessible': 'Accessible',
+  'free': 'Free Admission',
+  'rides-games': 'Rides & Games'
+}
+ 
+// Extract amenities from description field (for pumpkin patches with emoji badges)
+export function extractAmenitiesFromDescription(description) {
+  if (!description) return []
+  const amenities = []
+  if (description.includes('🐕') || description.includes('Dog Friendly')) {
+    amenities.push('dog-friendly')
+  }
+  if (description.includes('♿') || description.includes('Accessible')) {
+    amenities.push('wheelchair-accessible')
+  }
+  if (description.includes('💚') || description.includes('Free Admission')) {
+    amenities.push('free')
+  }
+  if (description.includes('🎡') || description.includes('Rides & Games')) {
+    amenities.push('rides-games')
+  }
+  return amenities
+}
+ 
 
