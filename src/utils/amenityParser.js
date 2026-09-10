@@ -79,6 +79,3 @@ export function getAmenityBadges(event) {
     label: AMENITY_LABELS[amenityId]
   }));
 }
- 
-
-
