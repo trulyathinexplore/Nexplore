@@ -1,8 +1,6 @@
 
- 
- 
 // Pill config — each pill declares HOW it filters.
-// type: 'all' | 'eventType' | 'category' | 'tagGroup' | 'seasonalType'
+// type: 'all' | 'eventType' | 'category' | 'tagGroup'
 // fixedAmenities (optional): a curated, always-shown sub-pill list. If absent,
 // sub-pills are computed dynamically from whatever tags exist on matching events (unchanged default behavior).
 export const PILLS = [
@@ -103,19 +101,12 @@ export function matchesPill(ev, pill) {
 // Sub-filter tags to always exclude from amenity pills
 export const EXCLUDED_AMENITY_TAGS = ['family-friendly', 'family friendly']
  
-// Amenity emoji mapping for pumpkin patches and description-based filters
-export const AMENITY_EMOJIS = {
-  'dog-friendly': '🐕',
-  'wheelchair-accessible': '♿',
-  'free': '💚',
-  'rides-games': '🎡'
-}
- 
+// Amenity emoji and label mapping for pumpkin patches
 export const AMENITY_LABELS = {
-  'dog-friendly': 'Dog Friendly',
-  'wheelchair-accessible': 'Accessible',
-  'free': 'Free Admission',
-  'rides-games': 'Rides & Games'
+  'dog-friendly': '🐕 Dog Friendly',
+  'wheelchair-accessible': '♿ Accessible',
+  'free': '💚 Free Admission',
+  'rides-games': '🎡 Rides & Games'
 }
  
 // Extract amenities from description field (for pumpkin patches with emoji badges)
@@ -136,5 +127,3 @@ export function extractAmenitiesFromDescription(description) {
   }
   return amenities
 }
- 
-
