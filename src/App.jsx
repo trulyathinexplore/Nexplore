@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchEvents, mapEvent } from './supabase.js'
-import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS } from './constants.js'
+import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, extractAmenitiesFromDescription, AMENITY_LABELS } from './constants.js'
 import { trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch, trackPageEngagement, trackJuly4thFilter } from './analytics.js'
 import { readFilters, writeFilters } from './urlState.js'
 import {
@@ -9,7 +9,8 @@ import {
 const PILL_LABELS = PILLS.map((p) => p.label)
 const REGION_LABELS = Object.keys(REGION_CITIES)
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
-const NOW = new Date()
+const getAmenityLabel = (id) => AMENITY_LABELS[id] || prettify(id)
+  const NOW = new Date()
 const CURRENT_MONTH = NOW.getMonth()
 const CURRENT_YEAR = NOW.getFullYear()
 const CURRENT_MONTH_NAME = NOW.toLocaleString('en-US', { month: 'long' })
@@ -120,7 +121,7 @@ export default function App() {
   }, [])
 
   const activePill = PILLS.find((p) => p.label === pill) || PILLS[0]
-  const showAmenities = activePill.type === 'category' || activePill.type === 'tagGroup'
+  const showAmenities = activePill.type === 'category' || activePill.type === 'tagGroup' || activePill.type === 'seasonalType'
   // Only show date/time chips when Events pill is active
   const showDateChips = activePill.type === 'eventType'
 
@@ -206,21 +207,35 @@ export default function App() {
   const amenityOptions = activePill.fixedAmenities
     ? activePill.fixedAmenities
     : [...new Set(
-        base.flatMap((ev) =>
-          ev.tags
+        base.flatMap((ev) => {
+          // For seasonalType pills (Pumpkin Patches), extract from description
+          if (activePill.type === 'seasonalType') {
+            return extractAmenitiesFromDescription(ev.description || '')
+          }
+          // For category/tagGroup pills, extract from tags as before
+          return ev.tags
             .filter((t) => {
               if (t.tag_group !== 'amenity' && t.tag_group !== 'water-feature') return false
               if (EXCLUDED_AMENITY_TAGS.includes(t.name.toLowerCase())) return false
               return true
             })
             .map((t) => t.name)
-        ),
+        }),
       )].sort()
 
   // 'free' is a special case — it maps to price_type ('ev.free'), not a tag, so it can't be matched via ev.tags
-  const filtered = base.filter((ev) =>
-    amenities.every((a) => (a === 'free' ? ev.free === true : ev.tags.some((t) => t.name === a)))
-  )
+const filtered = base.filter((ev) => {
+    return amenities.every((a) => {
+      // For seasonalType pills, check description-based amenities
+      if (activePill.type === 'seasonalType') {
+        const descAmenities = extractAmenitiesFromDescription(ev.description || '')
+        return descAmenities.includes(a)
+      }
+      // For other pills, use tag-based logic (unchanged)
+      if (a === 'free') return ev.free === true
+      return ev.tags.some((t) => t.name === a)
+    })
+  })
 
   const now = new Date()
   const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
@@ -282,12 +297,13 @@ export default function App() {
       {/* Amenity sub-filters — only when category or Water Play active, excluding family-friendly */}
       {showAmenities && amenityOptions.length > 0 && (
         <div style={{ display: 'flex', gap: 6, padding: '8px 0 0 16px', overflowX: 'auto' }}>
-          {amenityOptions.map((name) => {
-            const on = amenities.includes(name)
-            return (
-              <div key={name} onClick={() => toggleAmenity(name)} style={{ flexShrink: 0, fontSize: 10, fontWeight: on ? 600 : 500, padding: '4px 11px', borderRadius: 20, border: `0.5px solid ${on ? '#1A6B4A' : '#E2DDD6'}`, color: on ? 'white' : '#888880', background: on ? '#1A6B4A' : 'white', cursor: 'pointer' }}>{prettify(name)}</div>
-            )
-          })}
+        {amenityOptions.map((name) => {
+  const on = amenities.includes(name)
+  const label = activePill.type === 'seasonalType' ? getAmenityLabel(name) : prettify(name)
+  return (
+    <div key={name} onClick={() => toggleAmenity(name)} style={{ flexShrink: 0, fontSize: 10, fontWeight: on ? 600 : 500, padding: '4px 11px', borderRadius: 20, border: `0.5px solid ${on ? '#1A6B4A' : '#E2DDD6'}`, color: on ? 'white' : '#888880', background: on ? '#1A6B4A' : 'white', cursor: 'pointer' }}>{label}</div>
+  )
+})}
         </div>
       )}
 
