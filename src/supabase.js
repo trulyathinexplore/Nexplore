@@ -1,4 +1,4 @@
-
+ 
 import { BEACHES } from './beachData.js'
  
 const SUPABASE_URL = 'https://kgythyenzjmnrzrlxynj.supabase.co'
@@ -57,7 +57,11 @@ export function mapEvent(e) {
     officialUrl: e.official_url || e.website_url || e.registration_url || '#',
     free: e.is_free || e.price_type === 'free' || false,
     price: e.price_label || (e.price_amount ? `$${e.price_amount}` : null),
-    ages: e.age_range || e.ages || 'All ages',
+    // No default. An empty string means "no age chip" (same as mapBeach).
+    // "All ages" carries no information and rendered literally as
+    // "Ages All ages" on every row that had no age_range set.
+    ages: e.age_range || e.ages || '',
+    needsReservation: e.registration_required || false,
     city,
     fullAddress,
     area: e.area || city || 'Bay Area',
@@ -89,6 +93,7 @@ export function mapBeach(beach) {
     free: beach.free || false,
     price: beach.free ? null : 'Day-use fee',
     ages: '', // beaches show no age chip
+    needsReservation: false,
     city: beach.city,
     fullAddress: beach.fullAddress,
     area: beach.city || 'Bay Area',
@@ -102,6 +107,7 @@ export function mapBeach(beach) {
     contentType: '',
     seriesName: '',
     seasonalType: null,
+    categoryId: null, // beaches have no Supabase category row
     category: beach.category || 'Beach',
     tags: beach.tags || [],
   }
@@ -129,6 +135,3 @@ export async function resolveImage(officialUrl, id) {
     return null
   }
 }
- 
-
-
