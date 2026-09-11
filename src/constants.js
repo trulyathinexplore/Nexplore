@@ -97,7 +97,7 @@ export function matchesPill(ev, pill) {
   if (pill.type === 'eventType') return ev.eventType === pill.value
   if (pill.type === 'category') {
     const vals = Array.isArray(pill.value) ? pill.value : [pill.value]
-    return vals.includes(ev.category)
+    return vals.includes(ev.categoryId) || vals.includes(ev.category)
   }
   if (pill.type === 'tagGroup') return ev.tags.some((t) => t.tag_group === pill.value)
   if (pill.type === 'seasonalType') return ev.seasonalType === pill.value
