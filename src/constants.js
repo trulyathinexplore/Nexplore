@@ -13,8 +13,13 @@ export const PILLS = [
   {
     label: 'Pumpkin Patches',
     type: 'seasonalType',
-    value: 'halloween',
+    value: 'halloween-pumpkin',
     fixedAmenities: ['dog-friendly', 'wheelchair-accessible', 'free', 'rides-games']
+  },
+  {
+    label: 'Halloween',
+    type: 'seasonalType',
+    value: 'halloween-event'
   },
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
   // Hidden for now — content preserved for next year. Uncomment to bring back.
