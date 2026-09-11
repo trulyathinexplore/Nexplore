@@ -2,6 +2,15 @@
   command = "npm run build"
   publish = "dist"
 
+# Clean URL for the fall landing page.
+# This MUST stay above the catch-all below: Netlify applies the first
+# matching rule, so /fall would otherwise be swallowed by /* and serve
+# the React app instead of the landing page.
+[[redirects]]
+  from = "/fall"
+  to = "/fall.html"
+  status = 200
+
 # Shareable filter-state URLs: serve the SPA for any path so deep links work
 [[redirects]]
   from = "/*"
