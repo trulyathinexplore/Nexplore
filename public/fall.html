@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bay Area Fall Bucket List | Nexplore</title>
+<meta name="description" content="Your Bay Area fall bucket list. Apple picking, pumpkin patches, fall trails and foliage drives, with real places and current dates.">
+<link rel="canonical" href="https://nexplore.us/fall">
+<meta name="theme-color" content="#12100E">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Bay Area Fall Bucket List">
+<meta property="og:description" content="Apple picking, pumpkin patches, fall trails and foliage drives. All in one place.">
+<meta property="og:url" content="https://nexplore.us/fall">
+<meta property="og:image" content="https://nexplore.us/og-fall.jpg">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,700;0,800;1,800&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink:#12100E; --green:#1A6B4A; --orange:#C94F2C; --amber:#F0A03C;
+    --sheet:#F7F4EF; --line:#E2DDD6; --muted:#888880;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; height:100%}
+  body{
+    background:var(--ink); color:#fff;
+    font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  /* One screen, no scrolling. The grid absorbs whatever height is left,
+     so this fits a small iPhone and a large Android without tuning. */
+  .stage{
+    position:relative; width:100%; max-width:470px;
+    height:100vh; height:100dvh;
+    display:flex; flex-direction:column;
+    padding:calc(12px + env(safe-area-inset-top)) 13px calc(12px + env(safe-area-inset-bottom));
+    overflow-y:auto; overflow-x:hidden;
+  }
+  @media (min-width:800px){
+    .stage{height:min(94dvh,900px); border-radius:26px; box-shadow:0 24px 70px rgba(0,0,0,.55); background:#171412}
+  }
+
+  /* ---------- header ---------- */
+  header{text-align:center; flex:0 0 auto; padding:2px 4px 12px}
+  .logo{font-family:'Playfair Display',Georgia,serif; font-size:17px; font-weight:800; letter-spacing:-.3px; text-decoration:none}
+  .logo .g{color:#7FD4AC} .logo .x{color:var(--orange)}
+  h1{
+    font-family:'Playfair Display',Georgia,serif; font-weight:800;
+    font-size:clamp(24px,7vw,32px); line-height:1.08; letter-spacing:-.8px; margin:9px 0 7px;
+  }
+  h1 em{font-style:italic; color:var(--amber)}
+  .sub{
+    display:inline-flex; align-items:center; gap:7px; margin:0;
+    font-size:12px; font-weight:600; letter-spacing:.3px;
+    color:var(--amber); background:rgba(240,160,60,.13);
+    border:1px solid rgba(240,160,60,.3); border-radius:20px; padding:6px 14px;
+  }
+  .sub .hand{font-size:14px; animation:tap 1.8s ease-in-out infinite}
+  @keyframes tap{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-3px) scale(1.12)}}
+
+  /* ---------- 2x2 thumbnails ---------- */
+  .grid{
+    flex:1 1 auto; min-height:290px;
+    display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:10px;
+  }
+  .thumb{
+    position:relative; display:block; overflow:hidden; cursor:pointer;
+    border-radius:18px; border:0; padding:0; text-align:left;
+    font-family:inherit; color:#fff; text-decoration:none;
+    background:var(--tint,#2a2724);
+    box-shadow:0 4px 16px rgba(0,0,0,.35);
+    transition:transform .14s ease;
+  }
+  .thumb:active{transform:scale(.965)}
+  .thumb video,.thumb img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .ph{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:clamp(34px,11.5vw,52px); opacity:.9; padding-bottom:18%;
+    background:linear-gradient(155deg,var(--tint,#2a2724),rgba(0,0,0,.62));
+  }
+  .scrim{
+    position:absolute; inset:0;
+    background:linear-gradient(to top,rgba(0,0,0,.9) 0%,rgba(0,0,0,.5) 44%,rgba(0,0,0,0) 74%);
+  }
+
+  /* one-time light sweep so the tiles read as interactive, not as pictures */
+  .thumb::after{
+    content:''; position:absolute; inset:0; z-index:4; pointer-events:none;
+    background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.24) 50%,transparent 62%);
+    transform:translateX(-120%);
+    animation:sweep 2.6s ease-in-out 3;
+  }
+  .thumb:nth-child(2)::after{animation-delay:.16s}
+  .thumb:nth-child(3)::after{animation-delay:.32s}
+  .thumb:nth-child(4)::after{animation-delay:.48s}
+  @keyframes sweep{0%{transform:translateX(-120%)}45%,100%{transform:translateX(120%)}}
+
+  .num{
+    position:absolute; top:9px; left:9px; z-index:3;
+    width:23px; height:23px; border-radius:50%; background:rgba(255,255,255,.95); color:var(--ink);
+    font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  }
+  .when{
+    position:absolute; top:10px; right:9px; z-index:3;
+    font-size:9px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+    padding:4px 8px; border-radius:20px; color:#fff;
+  }
+  .when.now{background:var(--green)}
+  .when.soon{background:rgba(0,0,0,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px)}
+
+  .t-body{position:absolute; left:0; right:0; bottom:0; z-index:3; padding:0 10px 10px}
+  .t-title{
+    display:block; font-size:16px; font-weight:700; line-height:1.18;
+    letter-spacing:-.3px; margin-bottom:8px; text-shadow:0 1px 6px rgba(0,0,0,.5);
+  }
+  /* The tap target is the whole tile, but this pill is what tells people so. */
+  .pill{
+    display:inline-flex; align-items:center; gap:5px;
+    background:#fff; color:var(--ink); font-size:11.5px; font-weight:700;
+    padding:7px 12px; border-radius:20px; white-space:nowrap;
+    box-shadow:0 2px 10px rgba(0,0,0,.3);
+    animation:breathe 2.4s ease-in-out infinite;
+  }
+  .thumb:nth-child(2) .pill{animation-delay:.3s}
+  .thumb:nth-child(3) .pill{animation-delay:.6s}
+  .thumb:nth-child(4) .pill{animation-delay:.9s}
+  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+  .pill .arw{font-size:12px}
+
+  /* ---------- halloween bar ---------- */
+  .skip{
+    flex:0 0 auto; margin-top:10px; display:flex; align-items:center; gap:11px;
+    text-decoration:none; color:#fff; background:#241F1A; border:1px solid rgba(240,160,60,.35);
+    border-radius:16px; padding:11px 13px; min-height:56px;
+  }
+  .skip:active{transform:scale(.985)}
+  .skip .ico{font-size:23px; flex:0 0 auto}
+  .skip .tx{flex:1 1 auto; min-width:0}
+  .skip .k{display:block; font-size:9px; font-weight:700; letter-spacing:.9px; text-transform:uppercase; color:var(--amber)}
+  .skip .t{display:block; font-size:14.5px; font-weight:700; margin-top:1px; line-height:1.25}
+  .skip .arw{
+    flex:0 0 auto; background:var(--orange); width:32px; height:32px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:15px;
+  }
+
+  footer{flex:0 0 auto; text-align:center; font-size:11px; color:rgba(255,255,255,.4); padding-top:10px}
+  footer a{color:rgba(255,255,255,.62); text-decoration:none; font-weight:600}
+
+  /* ---------- bottom sheet ---------- */
+  .sheet-bg{position:fixed; inset:0; z-index:8; background:rgba(0,0,0,.58); opacity:0; pointer-events:none; transition:opacity .22s}
+  .sheet-bg.open{opacity:1; pointer-events:auto}
+  .sheet{
+    position:fixed; left:50%; bottom:0; width:100%; max-width:470px; z-index:9;
+    transform:translateX(-50%) translateY(102%);
+    background:var(--sheet); color:var(--ink);
+    border-radius:22px 22px 0 0; padding:8px 20px calc(24px + env(safe-area-inset-bottom));
+    max-height:82%; overflow-y:auto; transition:transform .28s cubic-bezier(.3,.8,.4,1);
+  }
+  .sheet.open{transform:translateX(-50%) translateY(0)}
+  .grab{width:38px; height:4px; border-radius:4px; background:var(--line); margin:6px auto 14px}
+  .sheet h3{font-family:'Playfair Display',Georgia,serif; font-size:23px; margin:0 0 3px}
+  .sheet .note{font-size:12.5px; color:var(--muted); margin:0 0 10px; line-height:1.5}
+  .places{list-style:none; margin:0; padding:0}
+  .places li{padding:12px 0; border-top:0.5px solid var(--line)}
+  .p-name{display:block; font-size:14.5px; font-weight:600; margin-bottom:2px}
+  .p-meta{display:block; font-size:12.5px; color:var(--muted); line-height:1.5}
+  .p-link{display:inline-block; margin-top:5px; font-size:12.5px; font-weight:600; color:var(--green); text-decoration:none}
+  .empty{font-size:13.5px; color:var(--muted); line-height:1.6; padding:14px 0}
+  .sheet-close{
+    margin-top:15px; width:100%; padding:14px; border-radius:11px; border:0.5px solid var(--line);
+    background:#fff; font-family:inherit; font-size:13.5px; font-weight:600; color:var(--green); cursor:pointer;
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .sub .hand,.pill,.thumb::after{animation:none}
+    .thumb,.sheet{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <header>
+    <a class="logo" href="/"><span class="g">Ne</span><span class="x">x</span><span class="g">plore</span></a>
+    <h1>Your Bay Area<br><em>fall</em> bucket list</h1>
+    <p class="sub"><span class="hand">👆</span> Tap a card to see where to go</p>
+  </header>
+
+  <div class="grid" id="grid"></div>
+
+  <a class="skip" href="/?view=halloween">
+    <span class="ico">🎃</span>
+    <span class="tx">
+      <span class="k">Not feeling fall?</span>
+      <span class="t">Skip straight to Halloween</span>
+    </span>
+    <span class="arw">&rarr;</span>
+  </a>
+
+  <footer>
+    Made by <a href="https://www.instagram.com/truly_athi/" target="_blank" rel="noopener">@truly_athi</a>
+    &nbsp;·&nbsp; <a href="/">Browse all of Nexplore</a>
+  </footer>
+</div>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Place list"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   HOW TO ADD YOUR VIDEOS  (this is the only step)
+
+   1. Make a folder:            public/videos/
+   2. Drop two files per card, named the same:
+                                apple.mp4   and  apple.jpg
+   3. Set  media: 'apple'  on that card below. Done.
+
+   The .jpg is a still frame from the clip. It is NOT optional:
+   iPhones in Low Power Mode refuse to autoplay video, and the
+   still is what people see instead. Export one frame as a JPG.
+
+   Clip specs: muted, 1 to 4 seconds, H.264 MP4, roughly square
+   crop, under about 400KB. All four play at once on this layout,
+   so file size matters more than length.
+
+   Leave media blank and the card shows the emoji placeholder,
+   so the page always looks finished.
+   ═══════════════════════════════════════════════════════════ */
+
+const VIDEO_DIR = 'videos/';
+
+const ITEMS = [
+  {
+    n: 1, title: 'Apple Picking', emoji: '🍎', tint: '#7A3B4A',
+    media: '',                                  // ← 'apple'  once apple.mp4 + apple.jpg exist
+    when: { label: 'Now', kind: 'now' },
+    mode: 'link', href: '/?view=fruit-picking',
+    cta: 'See the farms',
+    count: { categoryId: 17, noun: 'farms' }    // pill becomes "See 8 farms"
+  },
+  {
+    n: 2, title: 'Pumpkin Patches', emoji: '🎃', tint: '#8A4A1E',
+    media: '',                                  // ← 'pumpkin'
+    when: { label: 'Now', kind: 'now' },
+    mode: 'link', href: '/?view=pumpkin-patches',
+    cta: 'See the patches',
+    count: { categoryId: 14, noun: 'patches' }
+  },
+  {
+    n: 3, title: 'Fall Trails', emoji: '🍁', tint: '#6B5A1E',
+    media: '',                                  // ← 'trails'
+    when: { label: 'Nov', kind: 'soon' },
+    mode: 'sheet', cta: 'See the trails',
+    sheetNote: 'Bay Area only, nothing over an hour out.',
+    places: [
+      { name: 'Sycamore Grove Park', meta: 'Livermore · Sycamores going yellow to orange-red · Flat trails, picnic areas', link: '' },
+      { name: 'Shiloh Ranch Regional Park', meta: 'Sonoma County · Big Leaf Maple Trail · Rugged, not stroller friendly', link: '' },
+      { name: 'Forest of Nisene Marks', meta: 'Aptos · Maples, sycamores and cottonwoods along the creek', link: '' }
+    ]
+  },
+  {
+    n: 4, title: 'Foliage Drives', emoji: '🚗', tint: '#2F4A5A',
+    media: '',                                  // ← 'drives'
+    when: { label: 'Oct & Nov', kind: 'soon' },
+    mode: 'sheet', cta: 'See the drives',
+    sheetNote: 'Make a day trip or a weekend trip of it. Back roads and vineyards, best once the vines turn.',
+    places: [
+      { name: 'Silverado Trail', meta: 'Napa · Grapevines turning yellow, orange and red · Peaks in November', link: '' },
+      { name: 'West County Regional Trail', meta: 'Sonoma County · 5 paved accessible miles · Wetlands and farmland', link: '' }
+    ]
+  }
+];
+
+const SB = 'https://kgythyenzjmnrzrlxynj.supabase.co/rest/v1/';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtneXRoeWVuemptbnJ6cmx4eW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzOTY0MzUsImV4cCI6MjA5NDk3MjQzNX0.6qtAjUDmVlOUOTbbfr-YTU3AtsJ172lnBaIL9XlJ-Ys';
+
+/* ════════════════ nothing below here needs editing ════════════════ */
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* media:'apple'  ->  videos/apple.mp4 + videos/apple.jpg */
+function mediaHTML(it){
+  const m = (it.media || '').trim();
+  if (!m) return `<div class="ph">${it.emoji}</div>`;
+  const base = /^https?:|^\//.test(m) ? m : VIDEO_DIR + m;
+  return `<video muted loop playsinline preload="none"
+            poster="${esc(base)}.jpg" data-src="${esc(base)}.mp4"></video>`;
+}
+
+document.getElementById('grid').innerHTML = ITEMS.map(it => {
+  const tag  = it.mode === 'link' ? 'a' : 'button';
+  const attr = it.mode === 'link' ? `href="${esc(it.href)}"` : `type="button" data-sheet="${it.n}"`;
+  return `<${tag} class="thumb" style="--tint:${it.tint}" ${attr} aria-label="${esc(it.title)}, ${esc(it.cta)}">
+    ${mediaHTML(it)}
+    <span class="scrim"></span>
+    <span class="num">${it.n}</span>
+    <span class="when ${it.when.kind}">${esc(it.when.label)}</span>
+    <span class="t-body">
+      <span class="t-title">${esc(it.title)}</span>
+      <span class="pill" data-pill="${it.n}">${esc(it.cta)}<span class="arw">&rarr;</span></span>
+    </span>
+  </${tag}>`;
+}).join('');
+
+/* Play a clip only while its tile is on screen. */
+const vids = document.querySelectorAll('video[data-src]');
+if (vids.length){
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    const v = e.target;
+    if (e.isIntersecting){ if (!v.src) v.src = v.dataset.src; v.play().catch(()=>{}); }
+    else v.pause();
+  }), { threshold:.25 });
+  vids.forEach(v => io.observe(v));
+}
+
+/* bottom sheet */
+const sheet = document.getElementById('sheet'), sheetBg = document.getElementById('sheetBg');
+function openSheet(n){
+  const it = ITEMS.find(x => x.n === +n); if (!it) return;
+  const list = (it.places && it.places.length)
+    ? `<ul class="places">${it.places.map(p => `
+        <li><span class="p-name">${esc(p.name)}</span>
+        <span class="p-meta">${esc(p.meta||'')}</span>
+        ${p.link ? `<a class="p-link" href="${esc(p.link)}" target="_blank" rel="noopener">Details &rarr;</a>` : ''}</li>`).join('')}</ul>`
+    : `<div class="empty">Still putting this list together. Check back in a few days.</div>`;
+  sheet.innerHTML = `<div class="grab"></div><h3>${esc(it.title)}</h3>
+    <p class="note">${esc(it.sheetNote||'')}</p>${list}
+    <button class="sheet-close" type="button">Close</button>`;
+  sheet.classList.add('open'); sheetBg.classList.add('open');
+  sheet.querySelector('.sheet-close').onclick = closeSheet;
+}
+function closeSheet(){ sheet.classList.remove('open'); sheetBg.classList.remove('open'); }
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-sheet]');
+  if (b) openSheet(b.getAttribute('data-sheet'));
+});
+sheetBg.addEventListener('click', closeSheet);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+/* Live counts fold into the pill: "See the farms" -> "See 8 farms".
+   Fails silently, because no count beats a broken page. */
+(async () => {
+  const h = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
+  const get = async q => {
+    try { const r = await fetch(SB + 'events?select=id&status=eq.published&' + q, { headers:h });
+      return r.ok ? (await r.json()).length : null; } catch { return null; }
+  };
+  await Promise.all(ITEMS.filter(i => i.count).map(async it => {
+    const n = await get('category_id=eq.' + it.count.categoryId);
+    const el = document.querySelector(`[data-pill="${it.n}"]`);
+    if (n && el) el.innerHTML = `See ${n} ${esc(it.count.noun)}<span class="arw">&rarr;</span>`;
+  }));
+})();
+</script>
+
+</body>
+</html>
