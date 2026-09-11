@@ -71,7 +71,6 @@ export function mapEvent(e) {
     contentType: e.content_type || '',
     seriesName: e.series_name || '',
     seasonalType: e.seasonal_type || null,
-       categoryId: e.category_id || null,
     categoryId: e.category_id || null,
     category: e.categories?.name || null,
     tags: (e.event_tags || []).map((et) => et.tags).filter(Boolean),
