@@ -64,7 +64,6 @@ export function mapEvent(e) {
     startDate: e.start_date,
     endDate: e.end_date,
     dayLabel,
-    // Raw admin-entered day_label (null when derived) — EventCard prefers it.
     dayLabelRaw: e.day_label || null,
     timeLabel: e.time_label || '',
     isEditorPick: e.is_editor_pick || e.featured || false,
@@ -72,6 +71,8 @@ export function mapEvent(e) {
     contentType: e.content_type || '',
     seriesName: e.series_name || '',
     seasonalType: e.seasonal_type || null,
+       categoryId: e.category_id || null,
+    categoryId: e.category_id || null,
     category: e.categories?.name || null,
     tags: (e.event_tags || []).map((et) => et.tags).filter(Boolean),
   }
