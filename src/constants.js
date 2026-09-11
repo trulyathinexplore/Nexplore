@@ -12,18 +12,19 @@ export const PILLS = [
     fixedAmenities: ['free', 'waterparks', 'splash-pad', 'swim-lakes', 'fountain'] },
   {
     label: 'Pumpkin Patches',
-    type: 'seasonalType',
-    value: 'halloween-pumpkin',
+    type: 'category',
+    value: 14,
     fixedAmenities: ['dog-friendly', 'wheelchair-accessible', 'free', 'rides-games']
   },
   {
     label: 'Halloween',
     type: 'seasonalType',
-    value: 'halloween-event'
+    value: 'halloween'
   },
+  { label: 'Fruit Picking',  type: 'category', value: 17,
+    fixedAmenities: ['apple-picking'] },
+  { label: 'Holiday Events', type: 'category', value: 16 },
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
-  // Hidden for now — content preserved for next year. Uncomment to bring back.
-  // { label: 'July 4th',      type: 'seasonalType', value: 'july-4th' },
   { label: 'Zoo & Aquarium', type: 'category', value: ['Zoo', 'Aquarium']},
   { label: 'Museum',        type: 'category',  value: 'Museum' },
   { label: 'Beaches',       type: 'category',  value: 'Beach',
