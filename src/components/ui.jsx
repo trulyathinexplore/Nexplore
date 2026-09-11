@@ -132,6 +132,10 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
   const displayPrice = extractPrice()
   const dateRange = formatDateRange()
 
+  // Only show the age chip for a real range like "5–12" or "4+".
+  // "All ages" says nothing and used to render literally as "Ages All ages".
+  const showAges = !!event.ages && event.ages.trim().toLowerCase() !== 'all ages'
+
   return (
     <div
       style={{
@@ -203,8 +207,12 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
               {locationLabel}{displayPrice ? ` · ${displayPrice}` : ''}
             </div>
 
-            {event.ages && (
+            {showAges && (
               <div style={{ display: 'inline-block', background: '#E8F5EE', color: '#1A6B4A', fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, marginBottom: 7 }}>Ages {event.ages}</div>
+            )}
+
+            {event.needsReservation && (
+              <div style={{ display: 'inline-block', background: '#FEF0E6', color: '#C94F2C', fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, marginBottom: 7, marginLeft: showAges ? 4 : 0 }}>🎟 Reservation required</div>
             )}
 
             <div
