@@ -117,8 +117,15 @@
   .t-body{position:absolute; left:0; right:0; bottom:0; z-index:3; padding:0 10px 10px}
   .t-title{
     display:block; font-size:16px; font-weight:700; line-height:1.18;
-    letter-spacing:-.3px; margin-bottom:8px; text-shadow:0 1px 6px rgba(0,0,0,.5);
+    letter-spacing:-.3px; margin-bottom:3px; text-shadow:0 1px 6px rgba(0,0,0,.5);
   }
+  /* Optional clarifier line under a title, e.g. "Trails & Streets". */
+  .t-sub{
+    display:block; font-size:10.5px; font-weight:600; line-height:1.3;
+    color:rgba(255,255,255,.74); margin-bottom:7px;
+    text-shadow:0 1px 5px rgba(0,0,0,.55);
+  }
+  .t-sub:empty{margin-bottom:5px}
   /* The tap target is the whole tile, but this pill is what tells people so. */
   .pill{
     display:inline-flex; align-items:center; gap:5px;
@@ -167,10 +174,22 @@
   .sheet h3{font-family:'Playfair Display',Georgia,serif; font-size:23px; margin:0 0 3px}
   .sheet .note{font-size:12.5px; color:var(--muted); margin:0 0 10px; line-height:1.5}
   .places{list-style:none; margin:0; padding:0}
-  .places li{padding:12px 0; border-top:0.5px solid var(--line)}
+  .places li{border-top:0.5px solid var(--line)}
+  /* A row with a reel is one big tap target. A row without one is inert
+     and shows no play button, so nothing looks broken when tapped. */
+  .place{
+    display:flex; align-items:center; gap:12px; padding:12px 0;
+    text-decoration:none; color:inherit;
+  }
+  a.place:active{opacity:.6}
+  .p-txt{flex:1 1 auto; min-width:0}
   .p-name{display:block; font-size:14.5px; font-weight:600; margin-bottom:2px}
   .p-meta{display:block; font-size:12.5px; color:var(--muted); line-height:1.5}
-  .p-link{display:inline-block; margin-top:5px; font-size:12.5px; font-weight:600; color:var(--green); text-decoration:none}
+  .play{
+    flex:0 0 auto; width:31px; height:31px; border-radius:50%;
+    background:var(--green); color:#fff; font-size:10px;
+    display:flex; align-items:center; justify-content:center; padding-left:2px;
+  }
   .empty{font-size:13.5px; color:var(--muted); line-height:1.6; padding:14px 0}
   .sheet-close{
     margin-top:15px; width:100%; padding:14px; border-radius:11px; border:0.5px solid var(--line);
@@ -214,31 +233,37 @@
 
 <script>
 /* ═══════════════════════════════════════════════════════════
-   HOW TO ADD YOUR VIDEOS  (this is the only step)
+   HOW TO CHANGE THE PICTURE ON EACH CARD
 
-   1. Make a folder:            public/videos/
-   2. Drop two files per card, named the same:
-                                apple.mp4   and  apple.jpg
-   3. Set  media: 'apple'  on that card below. Done.
+   All files live in one folder:  public/media/
+   Then set `media:` on the card. Three ways to write it:
 
-   The .jpg is a still frame from the clip. It is NOT optional:
-   iPhones in Low Power Mode refuse to autoplay video, and the
-   still is what people see instead. Export one frame as a JPG.
+   media: 'apple.jpg'   → just a photo. Simplest. Start here.
+   media: 'apple'       → video. Needs BOTH apple.mp4 and
+                          apple.jpg in the folder.
+   media: ''            → the emoji placeholder (current state)
 
-   Clip specs: muted, 1 to 4 seconds, H.264 MP4, roughly square
-   crop, under about 400KB. All four play at once on this layout,
-   so file size matters more than length.
+   PHOTOS: roughly square, about 800x800, JPG, under ~200KB.
+   The bottom third is covered by the title and button, so keep
+   the subject in the upper two thirds.
 
-   Leave media blank and the card shows the emoji placeholder,
-   so the page always looks finished.
+   VIDEOS: the .jpg is a still frame from the clip and is NOT
+   optional. iPhones in Low Power Mode refuse to autoplay, and
+   the still is what those people see instead. Clip specs:
+   muted, 1 to 4 seconds, H.264 MP4, square crop, under ~400KB.
+   All four play at once here, so file size matters more than
+   length.
+
+   You can also just change `emoji:` if you want a different
+   placeholder for now.
    ═══════════════════════════════════════════════════════════ */
 
-const VIDEO_DIR = 'videos/';
+const MEDIA_DIR = 'media/';
 
 const ITEMS = [
   {
     n: 1, title: 'Apple Picking', emoji: '🍎', tint: '#7A3B4A',
-    media: '',                                  // ← 'apple'  once apple.mp4 + apple.jpg exist
+    media: '',                                  // ← 'apple.jpg' for a photo, or 'apple' for video
     when: { label: 'Now', kind: 'now' },
     mode: 'link', href: '/?view=fruit-picking',
     cta: 'See the farms',
@@ -246,33 +271,39 @@ const ITEMS = [
   },
   {
     n: 2, title: 'Pumpkin Patches', emoji: '🎃', tint: '#8A4A1E',
-    media: '',                                  // ← 'pumpkin'
+    media: '',                                  // ← 'pumpkin.jpg' or 'pumpkin'
     when: { label: 'Now', kind: 'now' },
     mode: 'link', href: '/?view=pumpkin-patches',
     cta: 'See the patches',
     count: { categoryId: 14, noun: 'patches' }
   },
   {
-    n: 3, title: 'Fall Trails', emoji: '🍁', tint: '#6B5A1E',
-    media: '',                                  // ← 'trails'
+    n: 3, title: 'Fall Color Spots', sub: 'Trails & Streets', emoji: '🍁', tint: '#6B5A1E',
+    media: '',                                  // ← 'spots.jpg' or 'spots'
     when: { label: 'Nov', kind: 'soon' },
-    mode: 'sheet', cta: 'See the trails',
-    sheetNote: 'Bay Area only, nothing over an hour out.',
+    mode: 'sheet', cta: 'See the spots',
+    sheetNote: 'Tree-lined streets, parks and gardens where the color actually turns.',
     places: [
-      { name: 'Sycamore Grove Park', meta: 'Livermore · Sycamores going yellow to orange-red · Flat trails, picnic areas', link: '' },
-      { name: 'Shiloh Ranch Regional Park', meta: 'Sonoma County · Big Leaf Maple Trail · Rugged, not stroller friendly', link: '' },
-      { name: 'Forest of Nisene Marks', meta: 'Aptos · Maples, sycamores and cottonwoods along the creek', link: '' }
+      { name: 'Palo Alto',          meta: 'Bowdoin St, Martin Ave and Pitman Ave', reel: 'https://www.instagram.com/p/DRkMPGUkSNJ/' },
+      { name: 'Downtown Los Altos', meta: '',                                      reel: 'https://www.instagram.com/p/DPWcQBPETzU/' },
+      { name: 'Mountain View',      meta: 'Sylvan Park and Gretel Lane',            reel: 'https://www.instagram.com/p/DRkMPGUkSNJ/' },
+      { name: 'Niles Community Park', meta: 'Fremont',                             reel: 'https://www.instagram.com/p/DRSIq-NkQb_/' },
+      { name: 'Livermore',          meta: '',                                      reel: 'https://www.instagram.com/p/DQzPLDbEZTw/' },
+      { name: 'Annabel Trail',      meta: 'San Ramon',                             reel: 'https://www.instagram.com/p/DRUs7DlEfzX/' },
+      { name: 'Filoli Gardens',     meta: 'Woodside',                              reel: '' },
+      { name: 'Napa',               meta: '',                                      reel: 'https://www.instagram.com/p/DQmWCMnEVk2/' }
     ]
   },
   {
-    n: 4, title: 'Foliage Drives', emoji: '🚗', tint: '#2F4A5A',
-    media: '',                                  // ← 'drives'
-    when: { label: 'Oct & Nov', kind: 'soon' },
-    mode: 'sheet', cta: 'See the drives',
-    sheetNote: 'Make a day trip or a weekend trip of it. Back roads and vineyards, best once the vines turn.',
+    n: 4, title: 'Fall Weekend Trips', emoji: '🚗', tint: '#2F4A5A',
+    media: '',                                  // ← 'trips.jpg' or 'trips'
+    when: { label: 'Oct', kind: 'soon' },
+    mode: 'sheet', cta: 'See the trips',
+    sheetNote: 'Worth packing a bag for. The Sierra turns earlier than the Bay Area does.',
     places: [
-      { name: 'Silverado Trail', meta: 'Napa · Grapevines turning yellow, orange and red · Peaks in November', link: '' },
-      { name: 'West County Regional Trail', meta: 'Sonoma County · 5 paved accessible miles · Wetlands and farmland', link: '' }
+      { name: 'Yosemite in Fall',    meta: '', reel: 'https://www.instagram.com/p/DQrhNmXCRHc/' },
+      { name: 'Mammoth in Fall',     meta: '', reel: 'https://www.instagram.com/p/DczjXz4P7Rr/' },
+      { name: 'Lake Tahoe in Fall',  meta: '', reel: '' }
     ]
   }
 ];
@@ -284,11 +315,23 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-/* media:'apple'  ->  videos/apple.mp4 + videos/apple.jpg */
+/* Works out what you meant from the filename:
+     'apple.jpg'  -> photo
+     'apple.mp4'  -> video, no still frame
+     'apple'      -> video + matching still frame
+     ''           -> emoji placeholder                                */
 function mediaHTML(it){
   const m = (it.media || '').trim();
   if (!m) return `<div class="ph">${it.emoji}</div>`;
-  const base = /^https?:|^\//.test(m) ? m : VIDEO_DIR + m;
+  const base = /^https?:|^\//.test(m) ? m : MEDIA_DIR + m;
+  const ext  = (m.split('.').pop() || '').toLowerCase();
+
+  if (['jpg','jpeg','png','webp','avif','gif'].includes(ext))
+    return `<img src="${esc(base)}" alt="" loading="lazy">`;
+
+  if (['mp4','webm','mov'].includes(ext))
+    return `<video muted loop playsinline preload="none" data-src="${esc(base)}"></video>`;
+
   return `<video muted loop playsinline preload="none"
             poster="${esc(base)}.jpg" data-src="${esc(base)}.mp4"></video>`;
 }
@@ -303,6 +346,7 @@ document.getElementById('grid').innerHTML = ITEMS.map(it => {
     <span class="when ${it.when.kind}">${esc(it.when.label)}</span>
     <span class="t-body">
       <span class="t-title">${esc(it.title)}</span>
+      <span class="t-sub">${it.sub ? esc(it.sub) : ''}</span>
       <span class="pill" data-pill="${it.n}">${esc(it.cta)}<span class="arw">&rarr;</span></span>
     </span>
   </${tag}>`;
@@ -323,11 +367,19 @@ if (vids.length){
 const sheet = document.getElementById('sheet'), sheetBg = document.getElementById('sheetBg');
 function openSheet(n){
   const it = ITEMS.find(x => x.n === +n); if (!it) return;
+  const row = p => {
+    const inner = `<span class="p-txt">
+        <span class="p-name">${esc(p.name)}</span>
+        ${p.meta ? `<span class="p-meta">${esc(p.meta)}</span>` : ''}
+      </span>${p.reel ? `<span class="play">&#9654;</span>` : ''}`;
+    return `<li>${p.reel
+      ? `<a class="place" href="${esc(p.reel)}" target="_blank" rel="noopener">${inner}</a>`
+      : `<span class="place">${inner}</span>`}</li>`;
+  };
+  const hasReels = (it.places || []).some(p => p.reel);
   const list = (it.places && it.places.length)
-    ? `<ul class="places">${it.places.map(p => `
-        <li><span class="p-name">${esc(p.name)}</span>
-        <span class="p-meta">${esc(p.meta||'')}</span>
-        ${p.link ? `<a class="p-link" href="${esc(p.link)}" target="_blank" rel="noopener">Details &rarr;</a>` : ''}</li>`).join('')}</ul>`
+    ? `${hasReels ? `<p class="note" style="margin-bottom:6px">Tap a spot to watch the reel.</p>` : ''}
+       <ul class="places">${it.places.map(row).join('')}</ul>`
     : `<div class="empty">Still putting this list together. Check back in a few days.</div>`;
   sheet.innerHTML = `<div class="grab"></div><h3>${esc(it.title)}</h3>
     <p class="note">${esc(it.sheetNote||'')}</p>${list}
