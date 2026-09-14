@@ -113,12 +113,6 @@ export default function App() {
     writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search })
   }, [pill, region, freeOnly, weekend, month, amenities, search])
 
-  // A filter change can empty the map out from under an open map view.
-  // Dropping back to the list beats staring at a blank map.
-  useEffect(() => {
-    if (showMap && !loading && mappable.length === 0) setShowMap(false)
-  }, [showMap, loading, mappable.length])
-
   // Body must not scroll behind the full-screen map on iOS.
   useEffect(() => {
     if (!showMap) return
@@ -261,6 +255,18 @@ const filtered = base.filter((ev) => {
   // As coordinates land on other categories, it starts appearing there too,
   // with no further changes here.
   const mappable = upcoming.filter((ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number')
+
+  // A filter change can empty the map out from under an open map view; drop
+  // back to the list rather than show a blank map.
+  //
+  // This MUST stay below `mappable`. A dependency array is evaluated during
+  // render, so referencing `mappable.length` from an effect declared earlier in
+  // the component throws "Cannot access 'mappable' before initialization" and
+  // white-screens the whole app. `vite build` does not catch it — see
+  // .smoke/render-test.jsx, which does.
+  useEffect(() => {
+    if (showMap && !loading && mappable.length === 0) setShowMap(false)
+  }, [showMap, loading, mappable.length])
 
  const filterCount = [weekend, freeOnly, !!region, !!selectedMonthFilter].filter(Boolean).length + amenities.length
 
