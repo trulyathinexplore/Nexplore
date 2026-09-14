@@ -1,5 +1,6 @@
  
 import { BEACHES } from './beachData.js'
+import { EVENT_COORDS } from './eventCoords.js'
  
 const SUPABASE_URL = 'https://kgythyenzjmnrzrlxynj.supabase.co'
 const SUPABASE_ANON =
@@ -12,7 +13,7 @@ const headers = {
  
 // Embed category name + tags + venue (for city/address) so pills/amenities can filter on them.
 export async function fetchEvents({ freeOnly = false } = {}) {
-const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,address,city,state)'
+const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,address,city,state,latitude,longitude)'
    let url = `${SUPABASE_URL}/rest/v1/events?select=${encodeURIComponent(select)}&status=eq.published&order=start_date.asc`
   if (freeOnly) url += '&is_free=eq.true'
   const res = await fetch(url, { headers })
@@ -26,6 +27,14 @@ const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,
   return [...events, ...filtered]
 }
  
+// Supabase returns numeric columns as numbers, but a hand-edited row can carry
+// a string, and Number('') is 0 — which would drop a pin in the Atlantic.
+function numOrNull(v) {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
 export function mapEvent(e) {
   // Beaches arrive already in app shape (see mapBeach) — passing them through
   // mapEvent a second time would strip category/tags, so short-circuit here.
@@ -37,11 +46,25 @@ export function mapEvent(e) {
   const venueState = e.venues?.state || ''
   const city = venueCity || e.city || ''
  
-  // Full address for Google Maps directions
-  const fullAddress = venueAddress && venueCity
-    ? `${venueAddress}, ${venueCity}, ${venueState || 'CA'}`
-    : city || 'Bay Area, CA'
+  // Full address for Google Maps directions. Falling straight through to the
+  // bare city sent "Directions" to a town centre rather than the venue, so the
+  // event's own address column and eventCoords.js are both tried first.
+  const coords = EVENT_COORDS[e.id]
+  const fullAddress =
+    (venueAddress && venueCity && `${venueAddress}, ${venueCity}, ${venueState || 'CA'}`) ||
+    coords?.address ||
+    (e.address && e.address.trim() && /\d/.test(e.address)
+      ? `${e.address}${city ? `, ${city}` : ''}, CA`
+      : null) ||
+    city ||
+    'Bay Area, CA'
  
+  // Coordinates for the map. A linked venue wins, because that's editable in
+  // the admin tool; eventCoords.js is the fallback for rows that have no venue
+  // yet. Once every patch has a venue row, the fallback can simply be deleted.
+  const lat = numOrNull(e.venues?.latitude) ?? numOrNull(coords?.lat) ?? null
+  const lng = numOrNull(e.venues?.longitude) ?? numOrNull(coords?.lng) ?? null
+
   let dayLabel = e.day_label || ''
   if (!dayLabel && e.start_date) {
     dayLabel = new Date(e.start_date + 'T12:00:00')
@@ -64,6 +87,8 @@ export function mapEvent(e) {
     needsReservation: e.registration_required || false,
     city,
     fullAddress,
+    lat,
+    lng,
     area: e.area || city || 'Bay Area',
     startDate: e.start_date,
     endDate: e.end_date,
@@ -96,6 +121,10 @@ export function mapBeach(beach) {
     needsReservation: false,
     city: beach.city,
     fullAddress: beach.fullAddress,
+    // Shape parity with mapEvent — a key present in one and absent in the other
+    // becomes undefined on half the array and breaks filters downstream.
+    lat: numOrNull(beach.lat),
+    lng: numOrNull(beach.lng),
     area: beach.city || 'Bay Area',
     startDate: null,
     endDate: null,

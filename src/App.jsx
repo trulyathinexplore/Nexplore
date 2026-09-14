@@ -6,6 +6,7 @@ import { readFilters, writeFilters } from './urlState.js'
 import {
   SearchIcon, FilterIcon, EventCard, EventCardSkeleton,  FilterDrawer,
 } from './components/ui.jsx'
+import MapView from './components/MapView.jsx'
 const PILL_LABELS = PILLS.map((p) => p.label)
 const REGION_LABELS = Object.keys(REGION_CITIES)
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
@@ -73,6 +74,7 @@ export default function App() {
   const [amenities, setAmenities] = useState(init.amenities)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedMonthFilter, setSelectedMonthFilter] = useState(null)
+  const [showMap, setShowMap] = useState(false)
 
   // Calculate current and next 2 months dynamically
   const getCurrentAndNextMonths = () => {
@@ -110,6 +112,20 @@ export default function App() {
   useEffect(() => {
     writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search })
   }, [pill, region, freeOnly, weekend, month, amenities, search])
+
+  // A filter change can empty the map out from under an open map view.
+  // Dropping back to the list beats staring at a blank map.
+  useEffect(() => {
+    if (showMap && !loading && mappable.length === 0) setShowMap(false)
+  }, [showMap, loading, mappable.length])
+
+  // Body must not scroll behind the full-screen map on iOS.
+  useEffect(() => {
+    if (!showMap) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [showMap])
 
   // Track page engagement (time spent on page)
   useEffect(() => {
@@ -240,6 +256,11 @@ const filtered = base.filter((ev) => {
   const now = new Date()
   const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
   const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
+
+  // The Map button only earns its place when something can actually be plotted.
+  // As coordinates land on other categories, it starts appearing there too,
+  // with no further changes here.
+  const mappable = upcoming.filter((ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number')
 
  const filterCount = [weekend, freeOnly, !!region, !!selectedMonthFilter].filter(Boolean).length + amenities.length
 
@@ -398,7 +419,34 @@ const filtered = base.filter((ev) => {
           </div>
         )
       )}
-      <div style={{ height: 32 }} />
+      <div style={{ height: 72 }} />
+
+      {/* Floating list/map toggle. An add-on to the list, never a replacement —
+          the list stays the default view on every load. */}
+      {!loading && mappable.length > 0 && !drawerOpen && !showMap && (
+        <button
+          onClick={() => setShowMap(true)}
+          style={{
+            position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 22, zIndex: 950,
+            display: 'flex', alignItems: 'center', gap: 7, background: '#2D2D2D', color: 'white',
+            border: 'none', borderRadius: 50, padding: '11px 20px', fontSize: 12, fontWeight: 700,
+            fontFamily: "'DM Sans', sans-serif", cursor: 'pointer',
+            boxShadow: '0 5px 18px rgba(0,0,0,0.3)',
+          }}
+        >
+          🗺 Map · {mappable.length}
+        </button>
+      )}
+
+      {showMap && (
+        <MapView
+          events={mappable}
+          onSelect={openOfficial}
+          onDirections={openDirections}
+          onClose={() => setShowMap(false)}
+        />
+      )}
+
       <FilterDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} region={region} setRegion={setRegion} freeOnly={freeOnly} setFreeOnly={setFreeOnly} />
     </div>
   )
