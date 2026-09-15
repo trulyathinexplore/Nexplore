@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { resolveImage } from '../supabase.js'
-import { cardBg, REGIONS } from '../constants.js'
+import { cardBg, REGIONS, themeFor } from '../constants.js'
 
 export function SearchIcon() {
   return (
@@ -90,7 +90,7 @@ export function EventCardSkeleton() {
   )
 }
 
-export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayground }) {
+export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, isPlayground, theme = themeFor(null) }) {
   // Show city name if available, otherwise fall back to area
   const locationLabel = event.city || event.area || 'Bay Area'
 
@@ -139,7 +139,7 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
   return (
     <div
       style={{
-        borderRadius: 14, overflow: 'hidden', background: 'white', border: '0.5px solid #E2DDD6',
+        borderRadius: 14, overflow: 'hidden', background: 'white', border: theme.cardBorder,
         boxShadow: '0 2px 8px rgba(26,107,74,0.08)', animation: 'fadeIn 0.3s ease',
         transition: 'transform 0.15s, box-shadow 0.15s',
       }}
@@ -154,12 +154,27 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
           <EventImage event={event} height={150} />
         )}
         {event.free ? (
-          <div style={{ position: 'absolute', top: 7, left: 7, background: '#1A6B4A', color: 'white', fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5 }}>FREE</div>
+          <div style={{ position: 'absolute', top: 7, left: 7, background: theme.freeBadgeBg, color: theme.freeBadgeFg, fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5, boxShadow: theme.freeBadgeBg === 'white' ? '0 1px 4px rgba(0,0,0,0.2)' : 'none' }}>FREE</div>
         ) : displayPrice ? (
           <div style={{ position: 'absolute', top: 7, left: 7, background: '#2D2D2D', color: 'white', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>{displayPrice}</div>
         ) : null}
+        {/* Pick moved to the left column. The top-right corner now belongs to
+            Share, and the two used to sit on top of each other. */}
         {isEditorPick && (
-          <div style={{ position: 'absolute', top: 7, right: 7, background: '#C94F2C', color: 'white', fontSize: 7, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>✦ Pick</div>
+          <div style={{ position: 'absolute', top: (event.free || displayPrice) ? 25 : 7, left: 7, background: '#C94F2C', color: 'white', fontSize: 7, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>✦ Pick</div>
+        )}
+        {onShare && (
+          <div
+            onClick={(e) => { e.stopPropagation(); onShare(event) }}
+            title="Share"
+            style={{
+              position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            }}
+          >
+            <ShareGlyph size={13} color="#2D2D2D" />
+          </div>
         )}
         {isPlayground && (
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', padding: '6px 8px' }}>
@@ -179,13 +194,13 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
           <div style={{ display: 'flex', gap: 5 }}>
             <div
               onClick={(e) => { e.stopPropagation(); onDirections && onDirections(event) }}
-              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #1A6B4A', background: 'white', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.dirBorder, background: theme.dirBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.dirFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               📍 Directions
             </div>
             <div
               onClick={(e) => { e.stopPropagation(); onSelect(event) }}
-              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.learnFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               Learn more →
             </div>
@@ -194,7 +209,7 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
           /* All other cards: unchanged from before */
           <>
             {dateRange && (
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#C94F2C', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{dateRange}</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: theme.dateFg, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{dateRange}</div>
             )}
             <div
               onClick={() => onSelect(event)}
@@ -222,13 +237,13 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
             <div style={{ display: 'flex', gap: 5 }}>
               <div
                 onClick={(e) => { e.stopPropagation(); onDirections && onDirections(event) }}
-                style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #1A6B4A', background: 'white', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.dirBorder, background: theme.dirBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.dirFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 📍 Directions
               </div>
               <div
                 onClick={(e) => { e.stopPropagation(); onSelect(event) }}
-                style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.learnFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 Learn more →
               </div>
@@ -289,6 +304,152 @@ export function FilterDrawer({ open, onClose, region, setRegion, freeOnly, setFr
           </div>
         </div>
         <div onClick={onClose} style={{ marginTop: 20, background: '#1A6B4A', color: 'white', padding: 14, borderRadius: 12, textAlign: 'center', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>Show results</div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Sharing
+// ---------------------------------------------------------------------------
+
+export function ShareGlyph({ size = 14, color = '#2D2D2D' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+         strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+      <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" y1="2" x2="12" y2="14" />
+    </svg>
+  )
+}
+
+function Tile({ label, bg, ring, children, onClick }) {
+  return (
+    <div onClick={onClick} style={{ width: 58, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+      <div style={{ width: 46, height: 46, borderRadius: '50%', background: bg, border: ring || 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {children}
+      </div>
+      <div style={{ fontSize: 9, color: '#666', textAlign: 'center', lineHeight: 1.2 }}>{label}</div>
+    </div>
+  )
+}
+
+// The destinations are built by src/share.js; this component only lays them
+// out. `tiles` arrives as [{ key, label, bg, ring, icon, run }].
+export function ShareSheet({ open, onClose, heading, subheading, url, tiles, copied }) {
+  if (!open) return null
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+    >
+      <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, paddingBottom: 26 }}>
+        <div style={{ width: 40, height: 4, borderRadius: 4, background: '#E2DDD6', margin: '10px auto 0' }} />
+
+        <div style={{ padding: '12px 18px 12px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#2D2D2D' }}>{heading}</div>
+          {subheading && <div style={{ fontSize: 10, color: '#888880', marginTop: 2 }}>{subheading}</div>}
+        </div>
+
+        <div style={{ height: '0.5px', background: '#E2DDD6', margin: '0 18px' }} />
+
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '16px 18px 4px' }}>
+          {tiles.map((t) => (
+            <Tile key={t.key} label={t.label} bg={t.bg} ring={t.ring} onClick={t.run}>{t.icon}</Tile>
+          ))}
+        </div>
+
+        <div style={{ padding: '8px 18px 0', fontSize: 10, color: '#A8A29E', lineHeight: 1.5 }}>
+          {copied ? 'Link copied.' : 'Sending it to yourself is the easiest way to keep it for later.'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// What a shared link opens onto. Deliberately a sheet over the list rather than
+// a separate page: the recipient sees the one place their friend meant, and
+// closing it leaves them browsing everything else.
+export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null) }) {
+  if (!event) return null
+
+  // The emoji badge line at the end of a description is internal metadata that
+  // now lives in tags. Strip it so it is not shown twice.
+  const body = (event.description || '')
+    .split('\n')
+    .filter((line) => !/^\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{267F}]/u.test(line.trim()))
+    .join('\n')
+    .trim()
+
+  const amenityTags = (event.tags || []).filter((t) => t.tag_group === 'amenity')
+  const pretty = (s) => s.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 990, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto', paddingBottom: 26 }}
+      >
+        <div style={{ position: 'relative' }}>
+          <EventImage event={event} height={190} />
+          <div
+            onClick={onClose}
+            style={{ position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, lineHeight: 1, color: '#2D2D2D' }}
+          >
+            ×
+          </div>
+          <div
+            onClick={() => onShare(event)}
+            style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <ShareGlyph size={14} color="#2D2D2D" />
+          </div>
+        </div>
+
+        <div style={{ padding: '14px 18px 0' }}>
+          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 700, color: '#2D2D2D', lineHeight: 1.25 }}>{event.title}</div>
+          <div style={{ fontSize: 11, color: '#888880', marginTop: 4 }}>
+            {event.city || event.area}{event.price ? ` · ${event.price}` : event.free ? ' · Free' : ''}
+          </div>
+
+          {amenityTags.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
+              {amenityTags.map((t) => (
+                <div key={t.name} style={{ background: theme.accentSoft, color: theme.accent, fontSize: 9, fontWeight: 600, padding: '3px 8px', borderRadius: 10 }}>{pretty(t.name)}</div>
+              ))}
+            </div>
+          )}
+
+          {body && (
+            <div style={{ fontSize: 11.5, color: '#5C5C56', lineHeight: 1.65, marginTop: 12, whiteSpace: 'pre-line' }}>{body}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: 7, marginTop: 16 }}>
+            <div
+              onClick={() => onDirections(event)}
+              style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: theme.dirBorder, background: theme.dirBg, textAlign: 'center', fontSize: 12, fontWeight: 600, color: theme.dirFg, cursor: 'pointer' }}
+            >
+              📍 Directions
+            </div>
+            <div
+              onClick={() => onSelect(event)}
+              style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 12, fontWeight: 600, color: theme.learnFg, cursor: 'pointer' }}
+            >
+              Learn more →
+            </div>
+          </div>
+
+          <div
+            onClick={onClose}
+            style={{ marginTop: 10, textAlign: 'center', fontSize: 11, color: '#888880', cursor: 'pointer', padding: '8px 0' }}
+          >
+            See everything else nearby
+          </div>
+        </div>
       </div>
     </div>
   )
