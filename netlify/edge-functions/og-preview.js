@@ -72,6 +72,27 @@ const VIEWS = {
   'museum':          { noun: 'Museums',             query: 'category_id=eq.2' },
 }
 
+// Sections of the home page, shareable as ?section=. A query param rather than
+// a #hash precisely so this function can see it: a hash never reaches the
+// server, so a #fall link would arrive as the generic Nexplore card.
+const SECTIONS = {
+  fall: {
+    title: 'Your complete guide to Bay Area fall | Nexplore',
+    desc: 'From apple picking and pumpkin patches to the best fall colour streets and a weekend in the Sierra. All of it in one place, with the details you actually need.',
+    image: '/media/pumpkin.jpg',
+  },
+  weekend: {
+    title: 'Where are we going this weekend? | Nexplore',
+    desc: 'Pumpkin patches, fruit picking, beaches, playgrounds and museums across the Bay Area. Checked for cost, ages, parking and accessibility.',
+    image: '/media/spots.jpg',
+  },
+  about: {
+    title: 'About Nexplore',
+    desc: 'Built by a Bay Area mum who takes her two kids to all of it first. Family adventures in your neighborhood.',
+    image: '/og-fall.jpg',
+  },
+}
+
 const sbHeaders = { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
 
 async function viewPreview(url, slug, isMap) {
@@ -109,8 +130,15 @@ export default async (request, context) => {
 
   const id = url.searchParams.get('event')
 
-  // No single event, so this may still be a shared category or map link.
+  // No single event, so this may still be a shared section, category or map.
   if (!id) {
+    const sec = url.searchParams.get('section')
+    if (sec) {
+      const meta = SECTIONS[sec]
+      if (!meta) return
+      return html(meta.title, meta.desc, new URL(meta.image, url.origin).href, url.origin + url.search)
+    }
+
     const slug = url.searchParams.get('view')
     if (!slug || !/^[a-z0-9-]{1,40}$/.test(slug)) return
     const p = await viewPreview(url, slug, url.searchParams.get('map') === '1')
