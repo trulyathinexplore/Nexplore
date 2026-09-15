@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react'
 import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
 import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor } from './constants.js'
-import { trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch, trackPageEngagement, trackJuly4thFilter, trackShare } from './analytics.js'
+import {
+  trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch,
+  trackPageEngagement, trackJuly4thFilter, trackShare,
+  trackCategoryView, trackScrollDepth, trackAmenityFilter, trackMapOpen,
+  trackMapPinClick, trackShareArrival, trackSearchNoResults, trackEmptyState,
+} from './analytics.js'
 import { readFilters, writeFilters } from './urlState.js'
 import {
   SearchIcon, FilterIcon, EventCard, EventCardSkeleton,  FilterDrawer,
@@ -85,7 +90,7 @@ export default function App() {
   const [amenities, setAmenities] = useState(init.amenities)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedMonthFilter, setSelectedMonthFilter] = useState(null)
-  const [showMap, setShowMap] = useState(false)
+  const [showMap, setShowMap] = useState(init.map)
   // Sharing. `shareTarget` is null, or { kind: 'event', event } / { kind: 'view' }.
   const [shareTarget, setShareTarget] = useState(null)
   const [copied, setCopied] = useState(false)
@@ -126,8 +131,43 @@ export default function App() {
   }, [freeOnly])
 
   useEffect(() => {
-    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId })
-  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId])
+    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap })
+  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap])
+
+  // A real page_view per category. Without this GA sees one page_view for the
+  // whole visit and every standard report collapses the site into a single
+  // page, which is why per-category visits were not measurable at all.
+  useEffect(() => { trackCategoryView(pill) }, [pill])
+
+  // Someone arrived through a shared link. ?event= is produced by nothing but
+  // share, so it needs no tracking parameter to be recognisable.
+  useEffect(() => {
+    if (init.event) trackShareArrival('event', String(init.event))
+    else if (init.map) trackShareArrival('map', init.pill)
+    else if (window.location.search.includes('view=')) trackShareArrival('view', init.pill)
+  }, [])
+
+  // Scroll depth per category. GA's own scroll event fires once at 90% per
+  // page LOAD, which in a single page app is once per visit. Reset on every
+  // pill change so the numbers mean "how far down this category" rather than
+  // "how far down today".
+  useEffect(() => {
+    const hit = new Set()
+    const onScroll = () => {
+      const doc = document.documentElement
+      const scrollable = doc.scrollHeight - window.innerHeight
+      if (scrollable < 200) return // short list, nothing to measure
+      const pct = Math.round(((window.scrollY || 0) / scrollable) * 100)
+      for (const mark of [25, 50, 75, 100]) {
+        if (pct >= mark && !hit.has(mark)) {
+          hit.add(mark)
+          trackScrollDepth(mark, pill)
+        }
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [pill])
 
   // Body must not scroll behind the full-screen map on iOS.
   useEffect(() => {
@@ -168,7 +208,18 @@ export default function App() {
   }
 
   const toggleAmenity = (name) =>
-    setAmenities((cur) => (cur.includes(name) ? cur.filter((a) => a !== name) : [...cur, name]))
+    setAmenities((cur) => {
+      const on = !cur.includes(name)
+      trackAmenityFilter(name, on, pill)
+      return on ? [...cur, name] : cur.filter((a) => a !== name)
+    })
+
+  // One place for opening the map, so every entry point is tracked and the
+  // URL always reflects what is on screen.
+  const openMap = (source) => {
+    setShowMap(true)
+    trackMapOpen(source, pill, mappable.length)
+  }
 
   // Search handler with tracking
   const handleSearchChange = (newSearch) => {
@@ -261,6 +312,16 @@ const filtered = base.filter((ev) => {
   const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
   const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
 
+  // Which combinations come up empty, and what people searched for that we do
+  // not have. Both fire on the rendered result rather than on keystrokes, so a
+  // half-typed word never counts as a failed search.
+  useEffect(() => {
+    if (loading || error) return
+    if (upcoming.length > 0) return
+    if (search.trim().length > 2) trackSearchNoResults(search.trim(), pill)
+    trackEmptyState(base.length === 0 ? 'coming_soon' : 'no_results', pill)
+  }, [loading, error, upcoming.length, base.length, search, pill])
+
   // The Map button only earns its place when something can actually be plotted.
   // As coordinates land on other categories, it starts appearing there too,
   // with no further changes here.
@@ -350,6 +411,7 @@ const filtered = base.filter((ev) => {
 
   const shareEvent = (ev) => { setCopied(false); setShareTarget({ kind: 'event', event: ev }) }
   const shareView = () => { setCopied(false); setShareTarget({ kind: 'view' }) }
+  const shareMap = () => { setCopied(false); setShareTarget({ kind: 'map' }) }
 
   const sharePayload = !shareTarget ? null : shareTarget.kind === 'event'
     ? (() => {
@@ -357,20 +419,31 @@ const filtered = base.filter((ev) => {
         return {
           heading: ev.title,
           subheading: [ev.city || ev.area, ev.price || (ev.free ? 'Free' : null)].filter(Boolean).join(' · '),
-          url: eventUrl(ev),
+          // The sharer's pill rides along so the recipient lands on that
+          // category rather than on everything.
+          url: eventUrl(ev, pill),
           text: eventShareText(ev),
           subject: `Nexplore: ${ev.title}`,
           label: ev.title,
         }
       })()
-    : {
-        heading: pill === 'All' ? 'Things to do in the Bay Area' : pill,
-        subheading: `${upcoming.length} place${upcoming.length !== 1 ? 's' : ''} · nexplore.us`,
-        url: currentViewUrl(),
-        text: viewShareText(pill, upcoming.length),
-        subject: `Nexplore: ${pill === 'All' ? 'things to do' : pill}`,
-        label: `view:${pill}`,
-      }
+    : (() => {
+        const isMap = shareTarget.kind === 'map'
+        const n = isMap ? mappable.length : upcoming.length
+        return {
+          heading: pill === 'All' ? 'Things to do in the Bay Area' : pill,
+          subheading: isMap
+            ? `${n} on the map · nexplore.us`
+            : `${n} place${n !== 1 ? 's' : ''} · nexplore.us`,
+          // The address bar already carries the pill and the map flag, so the
+          // current URL IS the shareable one. Filters ride along here on
+          // purpose for a view share: the sharer chose to send this view.
+          url: currentViewUrl(),
+          text: viewShareText(pill, n, isMap),
+          subject: `Nexplore: ${pill === 'All' ? 'things to do' : pill}`,
+          label: `${isMap ? 'map' : 'view'}:${pill}`,
+        }
+      })()
 
   // sms: and mailto: are handed to location.href rather than window.open —
   // a popup-blocked window.open silently does nothing on iOS Safari.
@@ -529,7 +602,7 @@ const filtered = base.filter((ev) => {
                 List
               </div>
               <div
-                onClick={() => setShowMap(true)}
+                onClick={() => openMap('header_toggle')}
                 style={{ padding: '4px 10px', borderRadius: 20, fontSize: 9, fontWeight: showMap ? 700 : 500, background: showMap ? '#2D2D2D' : 'transparent', color: showMap ? 'white' : '#888880', cursor: 'pointer' }}
               >
                 Map
@@ -604,7 +677,7 @@ const filtered = base.filter((ev) => {
           the list stays the default view on every load. */}
       {!loading && mappable.length > 0 && !drawerOpen && !showMap && !openEvent && !shareTarget && (
         <button
-          onClick={() => setShowMap(true)}
+          onClick={() => openMap('floating_button')}
           style={{
             position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 22, zIndex: 950,
             display: 'flex', alignItems: 'center', gap: 8, background: '#2D2D2D', color: 'white',
@@ -620,8 +693,12 @@ const filtered = base.filter((ev) => {
       {showMap && (
         <MapView
           events={mappable}
+          theme={theme}
           onSelect={openOfficial}
           onDirections={openDirections}
+          onShare={shareEvent}
+          onShareView={shareMap}
+          onPinClick={(ev) => trackMapPinClick(ev.title, pill)}
           onClose={() => setShowMap(false)}
         />
       )}

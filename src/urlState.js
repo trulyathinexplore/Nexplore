@@ -1,6 +1,8 @@
 // Two-way sync between filter state and the URL query string,
 // so any filtered view is a shareable link.
-const slug = (s) => s.toLowerCase().replace(/\s+/g, '-')
+// Exported because share.js builds `view=` into shared links and has to use
+// the exact same spelling readFilters matches on.
+export const slug = (s) => s.toLowerCase().replace(/\s+/g, '-')
 
 export const DEFAULTS = {
   pill: 'All', region: null, free: false, weekend: false, month: true, amenities: [], q: '', event: null,
@@ -20,6 +22,9 @@ export function readFilters(search, pillLabels, regions) {
     // Set by a shared link. App.jsx opens the event sheet over the list when
     // this matches a loaded row, and clears it when the sheet is closed.
     event: p.get('event') || null,
+    // A shared map link. Opens on the map rather than the list, the same way
+    // a shared category link opens on that category.
+    map: p.get('map') === '1',
   }
 }
 
@@ -35,6 +40,9 @@ export function writeFilters(f) {
   // Kept in the URL while the sheet is open so a refresh, or a bookmark taken
   // mid-read, lands back on the same place.
   if (f.event) p.set('event', f.event)
+  // So the address bar always describes what is on screen, which is also what
+  // makes the map shareable without any extra plumbing.
+  if (f.map) p.set('map', '1')
   const qs = p.toString()
   const url = qs ? `${location.pathname}?${qs}` : location.pathname
   window.history.replaceState(null, '', url)

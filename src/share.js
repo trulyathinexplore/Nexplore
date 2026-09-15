@@ -3,6 +3,8 @@
 // One place for every string and URL that leaves the app, so the wording can
 // be changed without touching any component.
 
+import { slug } from './urlState.js'
+
 const ORIGIN = () =>
   (typeof window !== 'undefined' && window.location.origin) || 'https://nexplore.us'
 
@@ -12,8 +14,27 @@ const TAGLINE = 'Family adventures in your neighborhood'
 // than a /event/:id route: there is no detail page, and adding one would mean a
 // second surface to keep in sync with the card. App.jsx reads ?event= on load
 // and opens the event sheet over the list.
-export function eventUrl(ev) {
-  return `${ORIGIN()}/?event=${encodeURIComponent(ev.id)}`
+//
+// `viewLabel` is the pill the sharer was looking at, so the recipient lands on
+// that category rather than on everything. Deliberately the sharer's pill and
+// not one derived from the event: share a splash-pad playground from Water
+// Play and the recipient should get Water Play, because that is the context it
+// was sent in.
+//
+// Filters are deliberately NOT carried. The sharer's region and amenity chips
+// are theirs, and a recipient landing on a near-empty filtered list reads as
+// broken.
+export function eventUrl(ev, viewLabel) {
+  const view = viewSlug(viewLabel)
+  const q = view ? `view=${view}&` : ''
+  return `${ORIGIN()}/?${q}event=${encodeURIComponent(ev.id)}`
+}
+
+// Matches the spelling readFilters() matches on. 'All' resolves to nothing,
+// which is also the right answer once the All pill is gone.
+function viewSlug(label) {
+  if (!label || label === 'All') return ''
+  return encodeURIComponent(slug(label))
 }
 
 // A link to whatever the user is currently looking at: pill, region, amenity
@@ -28,11 +49,12 @@ export function eventShareText(ev) {
   return `Explore ${ev.title}${where ? `, ${where}` : ''} on Nexplore. ${TAGLINE}.`
 }
 
-export function viewShareText(pillLabel, count) {
+export function viewShareText(pillLabel, count, isMap) {
+  const where = isMap ? 'on a map' : 'in the Bay Area'
   if (pillLabel === 'All') {
-    return `Explore ${count} things to do with kids in the Bay Area on Nexplore. ${TAGLINE}.`
+    return `Explore ${count} things to do with kids ${where} on Nexplore. ${TAGLINE}.`
   }
-  return `Explore ${count} ${pillLabel} in the Bay Area on Nexplore. ${TAGLINE}.`
+  return `Explore ${count} ${pillLabel} ${where} on Nexplore. ${TAGLINE}.`
 }
 
 // Destination builders. Each takes the finished text and link and returns a URL
