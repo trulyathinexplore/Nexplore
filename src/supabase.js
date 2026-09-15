@@ -52,18 +52,32 @@ export function mapEvent(e) {
   const coords = EVENT_COORDS[e.id]
   const fullAddress =
     (venueAddress && venueCity && `${venueAddress}, ${venueCity}, ${venueState || 'CA'}`) ||
-    coords?.address ||
     (e.address && e.address.trim() && /\d/.test(e.address)
       ? `${e.address}${city ? `, ${city}` : ''}, CA`
       : null) ||
+    coords?.address ||
     city ||
     'Bay Area, CA'
  
   // Coordinates for the map. A linked venue wins, because that's editable in
   // the admin tool; eventCoords.js is the fallback for rows that have no venue
   // yet. Once every patch has a venue row, the fallback can simply be deleted.
-  const lat = numOrNull(e.venues?.latitude) ?? numOrNull(coords?.lat) ?? null
-  const lng = numOrNull(e.venues?.longitude) ?? numOrNull(coords?.lng) ?? null
+  // Precedence: linked venue, then the event's own columns, then the static
+  // file. The file is the legacy path — once every row carries coordinates in
+  // the database, eventCoords.js and its two imports here can be deleted.
+  const lat = numOrNull(e.venues?.latitude) ?? numOrNull(e.latitude) ?? numOrNull(coords?.lat) ?? null
+  const lng = numOrNull(e.venues?.longitude) ?? numOrNull(e.longitude) ?? numOrNull(coords?.lng) ?? null
+
+  // A street-level address, or null. Distinct from fullAddress, which falls
+  // back to a bare city so the Directions button always has something to send.
+  // resolveCoords() needs to know the difference: geocoding "Half Moon Bay"
+  // would pin four different farms to the same spot.
+  const eventStreet = e.address && /\d/.test(e.address) ? e.address.trim() : null
+  const addressLine =
+    (venueAddress && venueCity && `${venueAddress}, ${venueCity}`) ||
+    (eventStreet && `${eventStreet}${city ? `, ${city}` : ''}`) ||
+    coords?.address ||
+    null
 
   let dayLabel = e.day_label || ''
   if (!dayLabel && e.start_date) {
@@ -87,6 +101,7 @@ export function mapEvent(e) {
     needsReservation: e.registration_required || false,
     city,
     fullAddress,
+    addressLine,
     lat,
     lng,
     area: e.area || city || 'Bay Area',
@@ -121,6 +136,7 @@ export function mapBeach(beach) {
     needsReservation: false,
     city: beach.city,
     fullAddress: beach.fullAddress,
+    addressLine: beach.fullAddress || null,
     // Shape parity with mapEvent — a key present in one and absent in the other
     // becomes undefined on half the array and breaks filters downstream.
     lat: numOrNull(beach.lat),
@@ -142,6 +158,59 @@ export function mapBeach(beach) {
   }
 }
  
+// Coordinates for an event that has a street address but no lat/lng yet.
+//
+// Same shape as resolveImage below: look it up once, write it straight back to
+// Supabase, and never look it up again. So an address typed into the admin tool
+// turns into a pin by itself, and the row is only ever geocoded one time in its
+// life no matter how many people view it.
+//
+// Nominatim is free and needs no key, but it is donation-funded and its usage
+// policy asks for at most one request a second and no bulk work. Hence the
+// budget below and the delay in the caller. If Nexplore ever needs to geocode
+// in volume, move to a keyed service (Google, MapTiler, LocationIQ) by swapping
+// the fetch in this one function.
+const BAY = { latMin: 36.9, latMax: 39.0, lngMin: -123.5, lngMax: -121.2 }
+const coordCache = {}
+let geocodeBudget = 6 // per page load, deliberately small
+
+export async function resolveCoords(addressLine, id) {
+  if (!addressLine || geocodeBudget <= 0) return null
+  if (coordCache[addressLine] !== undefined) return coordCache[addressLine]
+  geocodeBudget -= 1
+  try {
+    const url =
+      'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' +
+      encodeURIComponent(`${addressLine}, CA, USA`)
+    const j = await (await fetch(url)).json()
+    const hit = j && j[0]
+    if (!hit) { coordCache[addressLine] = null; return null }
+
+    const lat = Number(hit.lat)
+    const lng = Number(hit.lon)
+    // Refuse anything outside the Bay Area rather than drop a pin in the wrong
+    // state. A geocoder handed a partial address will happily return the
+    // geographic centre of the country.
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+        lat < BAY.latMin || lat > BAY.latMax || lng < BAY.lngMin || lng > BAY.lngMax) {
+      coordCache[addressLine] = null
+      return null
+    }
+
+    const pair = { lat, lng }
+    coordCache[addressLine] = pair
+    fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify({ latitude: lat, longitude: lng }),
+    }).catch(() => {})
+    return pair
+  } catch {
+    coordCache[addressLine] = null
+    return null
+  }
+}
+
 // Microlink image resolution with in-memory cache + write-back to Supabase
 const imgCache = {}
 export async function resolveImage(officialUrl, id) {

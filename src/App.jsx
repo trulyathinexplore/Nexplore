@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchEvents, mapEvent } from './supabase.js'
+import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
 import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, extractAmenitiesFromDescription, AMENITY_LABELS } from './constants.js'
 import { trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch, trackPageEngagement, trackJuly4thFilter } from './analytics.js'
 import { readFilters, writeFilters } from './urlState.js'
@@ -8,6 +8,12 @@ import {
 } from './components/ui.jsx'
 import MapView from './components/MapView.jsx'
 const PILL_LABELS = PILLS.map((p) => p.label)
+
+// Which pills offer the map. 66 non-pumpkin rows (playgrounds, waterfronts,
+// amusement parks) are linked to venues that already carry lat/lng, so without
+// this gate the Map button turns up on almost every pill. Add a label here when
+// a category is ready to be mapped.
+const MAP_ENABLED_PILLS = ['Pumpkin Patches']
 const REGION_LABELS = Object.keys(REGION_CITIES)
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
 const getAmenityLabel = (id) => AMENITY_LABELS[id] || prettify(id)
@@ -254,7 +260,42 @@ const filtered = base.filter((ev) => {
   // The Map button only earns its place when something can actually be plotted.
   // As coordinates land on other categories, it starts appearing there too,
   // with no further changes here.
-  const mappable = upcoming.filter((ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number')
+  const mapEnabled = MAP_ENABLED_PILLS.includes(activePill.label)
+  const mappable = mapEnabled
+    ? upcoming.filter((ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number')
+    : []
+
+  // Back-fill coordinates for anything that has a street address but no
+  // lat/lng, the same way resolveImage back-fills a missing cover photo. The
+  // result is written to Supabase, so each row is geocoded once ever and an
+  // address added in the admin tool becomes a pin on its own.
+  //
+  // Like the effect below, this MUST stay under `upcoming` and `mapEnabled`:
+  // a dependency array is evaluated during render, and referencing either from
+  // higher up throws "Cannot access before initialization" and white-screens
+  // the app.
+  useEffect(() => {
+    if (!mapEnabled || loading) return
+    const todo = upcoming.filter((ev) => ev.lat == null && ev.addressLine).slice(0, 6)
+    if (todo.length === 0) return
+
+    let cancelled = false
+    ;(async () => {
+      for (const ev of todo) {
+        if (cancelled) return
+        const pair = await resolveCoords(ev.addressLine, ev.id)
+        if (cancelled) return
+        if (pair) {
+          setEvents((prev) =>
+            prev.map((r) => (r.id === ev.id ? { ...r, lat: pair.lat, lng: pair.lng } : r)),
+          )
+        }
+        // Nominatim's usage policy asks for no more than one request a second.
+        await new Promise((r) => setTimeout(r, 1200))
+      }
+    })()
+    return () => { cancelled = true }
+  }, [mapEnabled, loading, upcoming.length])
 
   // A filter change can empty the map out from under an open map view; drop
   // back to the list rather than show a blank map.
