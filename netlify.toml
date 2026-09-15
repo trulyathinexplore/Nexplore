@@ -2,6 +2,16 @@
   command = "npm run build"
   publish = "dist"
 
+# Per-event link previews for WhatsApp, iMessage, Facebook and friends.
+#
+# Edge functions run BEFORE the redirects below, so this needs no change to
+# the redirect ordering that the /fall comment warns about. The function
+# returns early for everything except a link crawler asking for "/?event=<id>",
+# so real visitors fall straight through to the app.
+[[edge_functions]]
+  path = "/"
+  function = "og-preview"
+
 # Clean URL for the fall landing page.
 # This MUST stay above the catch-all below: Netlify applies the first
 # matching rule, so /fall would otherwise be swallowed by /* and serve
