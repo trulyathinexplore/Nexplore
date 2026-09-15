@@ -8,19 +8,30 @@ import { EventCard } from './ui.jsx'
 // version of this component is kept alongside as MapView.google.jsx: swap the
 // filenames and add VITE_GOOGLE_MAPS_KEY to change back.
 //
-// CARTO's Voyager basemap is used instead of the standard OpenStreetMap tiles
-// for two reasons: it is muted enough that coloured pins read clearly on top of
-// it, and osm.org's own tile servers are donation-funded with a usage policy
-// that is not meant for a growing commercial site. Both are free public
-// services with no SLA. If Nexplore's traffic ever gets heavy enough to matter,
-// move to a paid tile plan (MapTiler, Stadia) by changing TILE_URL alone —
-// attribution must be updated to match whoever serves the tiles.
+// TILES: osm.org's standard basemap. Verified 2026-09-14 by loading a real Bay
+// Area tile and looking at it.
+//
+// CARTO's basemaps were used first and had to be abandoned: they now stamp
+// "API KEY REQUIRED / carto.com/basemaps/apikey" diagonally across every tile
+// unless you register. Both their Voyager and Positron styles do this. Do not
+// go back to a cartocdn.com URL without a key.
+//
+// osm.org's tiles are donation-funded, so their usage policy asks for modest
+// use and no heavy bulk traffic. Fine at Nexplore's current scale; if traffic
+// grows, move to a tile plan (MapTiler, Stadia, or CARTO with a key) by
+// changing TILE_URL alone — and update TILE_ATTRIB to credit whoever serves
+// them, which is a licence requirement rather than a courtesy.
+//
+// No {s} subdomain: osm.org serves over HTTP/2 and asks clients not to shard.
+// No detectRetina: osm.org publishes no @2x tiles, and Leaflet would instead
+// request four times as many tiles to fake it, which is exactly the bulk
+// traffic their policy asks us to avoid.
 const LEAFLET_VERSION = '1.9.4'
 const LEAFLET_JS = `https://cdnjs.cloudflare.com/ajax/libs/leaflet/${LEAFLET_VERSION}/leaflet.js`
 const LEAFLET_CSS = `https://cdnjs.cloudflare.com/ajax/libs/leaflet/${LEAFLET_VERSION}/leaflet.css`
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 const TILE_ATTRIB =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
 const DEFAULT_CENTER = [37.76, -122.25]
 const DEFAULT_ZOOM = 9
@@ -101,7 +112,7 @@ export default function MapView({ events, onSelect, onDirections, onClose }) {
           attributionControl: true,
         })
         L.control.zoom({ position: 'topright' }).addTo(map)
-        L.tileLayer(TILE_URL, { attribution: TILE_ATTRIB, maxZoom: 19, detectRetina: true }).addTo(map)
+        L.tileLayer(TILE_URL, { attribution: TILE_ATTRIB, maxZoom: 19, detectRetina: false }).addTo(map)
         map.on('click', () => setSelected(null))
         mapRef.current = map
         // The container is absolutely positioned inside a flex child, so its
@@ -233,7 +244,13 @@ export default function MapView({ events, onSelect, onDirections, onClose }) {
                 aria-label="Close"
                 style={{ position: 'absolute', top: -9, right: -6, zIndex: 3, width: 26, height: 26, borderRadius: '50%', background: 'white', border: '0.5px solid #E2DDD6', boxShadow: '0 2px 6px rgba(0,0,0,.16)', cursor: 'pointer', fontSize: 12, color: '#888880', lineHeight: 1, padding: 0, fontFamily: 'inherit' }}
               >✕</button>
+              {/* key is load-bearing. EventImage holds the resolved image in
+                  useState seeded once from props, with a mount-only effect.
+                  Without a key React reuses the same instance across taps, so
+                  the title and date update while the PHOTO stays on whichever
+                  patch was tapped first. Keying by id forces a remount. */}
               <EventCard
+                key={selected.id}
                 event={selected}
                 onSelect={onSelect}
                 onDirections={onDirections}

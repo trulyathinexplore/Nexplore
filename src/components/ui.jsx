@@ -215,11 +215,23 @@ export function EventCard({ event, onSelect, onDirections, isEditorPick, isPlayg
               <div style={{ display: 'inline-block', background: '#FEF0E6', color: '#C94F2C', fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, marginBottom: 7, marginLeft: showAges ? 4 : 0 }}>🎟 Reservation required</div>
             )}
 
-            <div
-              onClick={() => onSelect(event)}
-              style={{ display: 'block', width: '100%', padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 10, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer' }}
-            >
-              Learn more →
+            {/* Same two-button row the Playground cards use. Directions is
+                especially worth having here now that pumpkin patches carry real
+                street addresses — before, openDirections could only send Google
+                Maps a city name. */}
+            <div style={{ display: 'flex', gap: 5 }}>
+              <div
+                onClick={(e) => { e.stopPropagation(); onDirections && onDirections(event) }}
+                style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #1A6B4A', background: 'white', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                📍 Directions
+              </div>
+              <div
+                onClick={(e) => { e.stopPropagation(); onSelect(event) }}
+                style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: '0.5px solid #E2DDD6', background: '#F7F4EF', textAlign: 'center', fontSize: 9, fontWeight: 600, color: '#1A6B4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                Learn more →
+              </div>
             </div>
           </>
         )}
