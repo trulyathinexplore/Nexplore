@@ -14,7 +14,12 @@ export const PILLS = [
     label: 'Pumpkin Patches',
     type: 'category',
     value: 14,
-    fixedAmenities: ['dog-friendly', 'wheelchair-accessible', 'free', 'rides-games']
+    // 'free-admission' rather than 'free', and only on this pill. A patch can be
+    // free to walk into while its hayrides, corn maze and rides all cost money,
+    // so 'free' overpromises here. 'free' stays the special case in App.jsx that
+    // reads the is_free column; 'free-admission' is an ordinary tag, so it needs
+    // no code change. Every other pill keeps 'free' and is untouched.
+    fixedAmenities: ['dog-friendly', 'wheelchair-accessible', 'free-admission', 'rides-games']
   },
   {
     label: 'Halloween',
@@ -132,4 +137,63 @@ export function extractAmenitiesFromDescription(description) {
     amenities.push('rides-games')
   }
   return amenities
+}
+
+// ---------------------------------------------------------------------------
+// Per-pill theming.
+//
+// Only Pumpkin Patches deviates. Every other pill resolves to DEFAULT, whose
+// values are copied verbatim from what the components hardcoded before, so
+// nothing outside that one pill changes appearance.
+//
+// The split in the pumpkin theme is deliberate: BLACK carries every action
+// (Directions, Learn more) so it stays legible against the orange pumpkin
+// photography, and ORANGE carries identity (card outline, active pill, active
+// amenity chip). The FREE badge is the one element that sits on top of a photo,
+// which is why it inverts to a white pill rather than a coloured one.
+// ---------------------------------------------------------------------------
+const DEFAULT_THEME = {
+  cardBorder: '0.5px solid #E2DDD6',
+  freeBadgeBg: '#1A6B4A',
+  freeBadgeFg: 'white',
+  dateFg: '#C94F2C',
+  dirBg: 'white',
+  dirBorder: '0.5px solid #1A6B4A',
+  dirFg: '#1A6B4A',
+  learnBg: '#F7F4EF',
+  learnBorder: '0.5px solid #E2DDD6',
+  learnFg: '#1A6B4A',
+  pillActiveBg: '#2D2D2D',
+  pillActiveBorder: '#2D2D2D',
+  chipOnBg: '#1A6B4A',
+  chipOnBorder: '#1A6B4A',
+  chipOnFg: 'white',
+  accent: '#1A6B4A',
+  accentSoft: '#E8F5EE',
+}
+
+const PUMPKIN_THEME = {
+  ...DEFAULT_THEME,
+  cardBorder: '1px solid #EFCFB6',
+  freeBadgeBg: 'white',
+  freeBadgeFg: '#2D2D2D',
+  dirBg: 'white',
+  dirBorder: '0.5px solid #2D2D2D',
+  dirFg: '#2D2D2D',
+  learnBg: '#2D2D2D',
+  learnBorder: '0.5px solid #2D2D2D',
+  learnFg: 'white',
+  pillActiveBg: '#C94F2C',
+  pillActiveBorder: '#C94F2C',
+  chipOnBg: '#C94F2C',
+  chipOnBorder: '#C94F2C',
+  chipOnFg: 'white',
+  accent: '#C94F2C',
+  accentSoft: '#FEF0E6',
+}
+
+const PILL_THEMES = { 'Pumpkin Patches': PUMPKIN_THEME }
+
+export function themeFor(pillLabel) {
+  return PILL_THEMES[pillLabel] || DEFAULT_THEME
 }

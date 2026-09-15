@@ -59,3 +59,13 @@ export const trackJuly4thFilter = () => {
     event_type: 'seasonal',
   });
 };
+
+// Share opened or sent. `destination` is 'whatsapp', 'sms', 'email',
+// 'copy_link' or 'native'; `label` is the event title, or "view:<pill>" when
+// a whole filtered view is shared.
+export const trackShare = (destination, label) => {
+  trackEvent('share', {
+    destination: destination,
+    share_label: label,
+  });
+};

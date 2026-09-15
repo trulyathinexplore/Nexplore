@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
 import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
-import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, extractAmenitiesFromDescription, AMENITY_LABELS } from './constants.js'
-import { trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch, trackPageEngagement, trackJuly4thFilter } from './analytics.js'
+import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor } from './constants.js'
+import { trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch, trackPageEngagement, trackJuly4thFilter, trackShare } from './analytics.js'
 import { readFilters, writeFilters } from './urlState.js'
 import {
   SearchIcon, FilterIcon, EventCard, EventCardSkeleton,  FilterDrawer,
+  ShareSheet, EventSheet, ShareGlyph,
 } from './components/ui.jsx'
+import {
+  eventUrl, currentViewUrl, eventShareText, viewShareText,
+  targets, copyLink, canNativeShare, nativeShare,
+} from './share.js'
 import MapView from './components/MapView.jsx'
 const PILL_LABELS = PILLS.map((p) => p.label)
 
@@ -81,6 +86,11 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedMonthFilter, setSelectedMonthFilter] = useState(null)
   const [showMap, setShowMap] = useState(false)
+  // Sharing. `shareTarget` is null, or { kind: 'event', event } / { kind: 'view' }.
+  const [shareTarget, setShareTarget] = useState(null)
+  const [copied, setCopied] = useState(false)
+  // The id from ?event= on a shared link, held until the sheet is closed.
+  const [openEventId, setOpenEventId] = useState(init.event)
 
   // Calculate current and next 2 months dynamically
   const getCurrentAndNextMonths = () => {
@@ -116,8 +126,8 @@ export default function App() {
   }, [freeOnly])
 
   useEffect(() => {
-    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search })
-  }, [pill, region, freeOnly, weekend, month, amenities, search])
+    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId })
+  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId])
 
   // Body must not scroll behind the full-screen map on iOS.
   useEffect(() => {
@@ -137,6 +147,8 @@ export default function App() {
   }, [])
 
   const activePill = PILLS.find((p) => p.label === pill) || PILLS[0]
+  // Resolves to the shared default for every pill except Pumpkin Patches.
+  const theme = themeFor(activePill.label)
   const showAmenities = activePill.type === 'category' || activePill.type === 'tagGroup' || activePill.type === 'seasonalType'
   // Only show date/time chips when Events pill is active
   const showDateChips = activePill.type === 'eventType'
@@ -224,11 +236,9 @@ export default function App() {
     ? activePill.fixedAmenities
     : [...new Set(
         base.flatMap((ev) => {
-          // For seasonalType pills (Pumpkin Patches), extract from description
-          if (activePill.type === 'seasonalType') {
-            return extractAmenitiesFromDescription(ev.description || '')
-          }
-          // For category/tagGroup pills, extract from tags as before
+          // Every pill reads amenities from tags. Pumpkin patches used to parse
+          // them out of the description text instead; that path was removed once
+          // the pill stopped being a seasonalType and the tags were backfilled.
           return ev.tags
             .filter((t) => {
               if (t.tag_group !== 'amenity' && t.tag_group !== 'water-feature') return false
@@ -242,12 +252,6 @@ export default function App() {
   // 'free' is a special case — it maps to price_type ('ev.free'), not a tag, so it can't be matched via ev.tags
 const filtered = base.filter((ev) => {
     return amenities.every((a) => {
-      // For seasonalType pills, check description-based amenities
-      if (activePill.type === 'seasonalType') {
-        const descAmenities = extractAmenitiesFromDescription(ev.description || '')
-        return descAmenities.includes(a)
-      }
-      // For other pills, use tag-based logic (unchanged)
       if (a === 'free') return ev.free === true
       return ev.tags.some((t) => t.name === a)
     })
@@ -337,6 +341,91 @@ const filtered = base.filter((ev) => {
     { label: '🏷 Free only', active: freeOnly, toggle: toggleFreeOnly },
   ]
 
+  // ---- Sharing ------------------------------------------------------------
+  // A shared link can point at a row the current filters exclude, so look in
+  // the full loaded set rather than in `upcoming`.
+  const openEvent = openEventId
+    ? events.find((ev) => String(ev.id) === String(openEventId)) || null
+    : null
+
+  const shareEvent = (ev) => { setCopied(false); setShareTarget({ kind: 'event', event: ev }) }
+  const shareView = () => { setCopied(false); setShareTarget({ kind: 'view' }) }
+
+  const sharePayload = !shareTarget ? null : shareTarget.kind === 'event'
+    ? (() => {
+        const ev = shareTarget.event
+        return {
+          heading: ev.title,
+          subheading: [ev.city || ev.area, ev.price || (ev.free ? 'Free' : null)].filter(Boolean).join(' · '),
+          url: eventUrl(ev),
+          text: eventShareText(ev),
+          subject: `Nexplore: ${ev.title}`,
+          label: ev.title,
+        }
+      })()
+    : {
+        heading: pill === 'All' ? 'Things to do in the Bay Area' : pill,
+        subheading: `${upcoming.length} place${upcoming.length !== 1 ? 's' : ''} · nexplore.us`,
+        url: currentViewUrl(),
+        text: viewShareText(pill, upcoming.length),
+        subject: `Nexplore: ${pill === 'All' ? 'things to do' : pill}`,
+        label: `view:${pill}`,
+      }
+
+  // sms: and mailto: are handed to location.href rather than window.open —
+  // a popup-blocked window.open silently does nothing on iOS Safari.
+  const shareTiles = !sharePayload ? [] : [
+    {
+      key: 'whatsapp', label: 'WhatsApp', bg: '#25D366',
+      icon: (
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-5.1A8.5 8.5 0 1 1 21 11.5z" />
+        </svg>
+      ),
+      run: () => { trackShare('whatsapp', sharePayload.label); window.open(targets.whatsapp(sharePayload.text, sharePayload.url), '_blank') },
+    },
+    {
+      key: 'sms', label: 'Messages', bg: '#34C759',
+      icon: (
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 14.5a2.5 2.5 0 0 1-2.5 2.5H8l-4 3.5V5.5A2.5 2.5 0 0 1 6.5 3h12A2.5 2.5 0 0 1 21 5.5z" />
+        </svg>
+      ),
+      run: () => { trackShare('sms', sharePayload.label); window.location.href = targets.sms(sharePayload.text, sharePayload.url) },
+    },
+    {
+      key: 'email', label: 'Email', bg: '#F0EDE8',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#44403c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+          <path d="m3.5 7 8.5 5.5L20.5 7" />
+        </svg>
+      ),
+      run: () => { trackShare('email', sharePayload.label); window.location.href = targets.email(sharePayload.text, sharePayload.url, sharePayload.subject) },
+    },
+    {
+      key: 'copy', label: copied ? 'Copied' : 'Copy link', bg: '#F0EDE8',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#44403c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 13.5a4.5 4.5 0 0 0 6.8.5l2.7-2.7a4.5 4.5 0 0 0-6.4-6.4l-1.5 1.6" />
+          <path d="M14 10.5a4.5 4.5 0 0 0-6.8-.5l-2.7 2.7a4.5 4.5 0 0 0 6.4 6.4l1.5-1.6" />
+        </svg>
+      ),
+      run: async () => { const ok = await copyLink(sharePayload.url); setCopied(ok); trackShare('copy_link', sharePayload.label) },
+    },
+    ...(canNativeShare() ? [{
+      key: 'more', label: 'More', bg: '#F0EDE8',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#44403c" strokeWidth="2">
+          <circle cx="5.5" cy="12" r="1.6" fill="#44403c" />
+          <circle cx="12" cy="12" r="1.6" fill="#44403c" />
+          <circle cx="18.5" cy="12" r="1.6" fill="#44403c" />
+        </svg>
+      ),
+      run: () => { trackShare('native', sharePayload.label); nativeShare(sharePayload.heading, sharePayload.text, sharePayload.url) },
+    }] : []),
+  ]
+
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#F7F4EF' }}>
       {/* Header */}
@@ -366,7 +455,7 @@ const filtered = base.filter((ev) => {
       {/* Category / theme pills */}
       <div style={{ display: 'flex', gap: 6, padding: '10px 0 0 16px', overflowX: 'auto' }}>
         {PILLS.map((p) => (
-          <div key={p.label} onClick={() => choosePill(p.label)} style={{ flexShrink: 0, fontSize: 10, fontWeight: 500, padding: '4px 12px', borderRadius: 20, border: `0.5px solid ${pill === p.label ? '#2D2D2D' : '#E2DDD6'}`, color: pill === p.label ? 'white' : '#888880', background: pill === p.label ? '#2D2D2D' : 'white', cursor: 'pointer' }}>{p.label}</div>
+          <div key={p.label} onClick={() => choosePill(p.label)} style={{ flexShrink: 0, fontSize: 10, fontWeight: 500, padding: '4px 12px', borderRadius: 20, border: `0.5px solid ${pill === p.label ? themeFor(p.label).pillActiveBorder : '#E2DDD6'}`, color: pill === p.label ? 'white' : '#888880', background: pill === p.label ? themeFor(p.label).pillActiveBg : 'white', cursor: 'pointer' }}>{p.label}</div>
         ))}
       </div>
 
@@ -375,9 +464,9 @@ const filtered = base.filter((ev) => {
         <div style={{ display: 'flex', gap: 6, padding: '8px 0 0 16px', overflowX: 'auto' }}>
         {amenityOptions.map((name) => {
   const on = amenities.includes(name)
-  const label = activePill.type === 'seasonalType' ? getAmenityLabel(name) : prettify(name)
+  const label = prettify(name)
   return (
-    <div key={name} onClick={() => toggleAmenity(name)} style={{ flexShrink: 0, fontSize: 10, fontWeight: on ? 600 : 500, padding: '4px 11px', borderRadius: 20, border: `0.5px solid ${on ? '#1A6B4A' : '#E2DDD6'}`, color: on ? 'white' : '#888880', background: on ? '#1A6B4A' : 'white', cursor: 'pointer' }}>{label}</div>
+    <div key={name} onClick={() => toggleAmenity(name)} style={{ flexShrink: 0, fontSize: 10, fontWeight: on ? 600 : 500, padding: '4px 11px', borderRadius: 20, border: `0.5px solid ${on ? theme.chipOnBorder : '#E2DDD6'}`, color: on ? theme.chipOnFg : '#888880', background: on ? theme.chipOnBg : 'white', cursor: 'pointer' }}>{label}</div>
   )
 })}
         </div>
@@ -422,9 +511,42 @@ const filtered = base.filter((ev) => {
         <div style={{ borderBottom: '0.5px solid #E2DDD6', margin: '7px 0 0' }} />
       )}
 
-      {/* Count */}
-      <div style={{ fontSize: 9, fontWeight: 700, color: '#888880', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '9px 16px 6px' }}>
-        {loading ? 'Loading...' : `${upcoming.length} thing${upcoming.length !== 1 ? 's' : ''} to do`}
+      {/* Count, with the view toggle and Save or share alongside it.
+          The floating map button tested as easy to miss, and on its own it
+          never told anyone they were currently looking at a list. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 16px 6px' }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: '#888880', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+          {loading ? 'Loading...' : `${upcoming.length} thing${upcoming.length !== 1 ? 's' : ''} to do`}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {!loading && mappable.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'white', border: '0.5px solid #E2DDD6', borderRadius: 20, padding: 2 }}>
+              <div
+                onClick={() => setShowMap(false)}
+                style={{ padding: '4px 10px', borderRadius: 20, fontSize: 9, fontWeight: showMap ? 500 : 700, background: showMap ? 'transparent' : '#2D2D2D', color: showMap ? '#888880' : 'white', cursor: 'pointer' }}
+              >
+                List
+              </div>
+              <div
+                onClick={() => setShowMap(true)}
+                style={{ padding: '4px 10px', borderRadius: 20, fontSize: 9, fontWeight: showMap ? 700 : 500, background: showMap ? '#2D2D2D' : 'transparent', color: showMap ? 'white' : '#888880', cursor: 'pointer' }}
+              >
+                Map
+              </div>
+            </div>
+          )}
+
+          {!loading && upcoming.length > 0 && (
+            <div
+              onClick={shareView}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: theme.accentSoft, border: `0.5px solid ${theme.accent}33`, borderRadius: 20, cursor: 'pointer' }}
+            >
+              <ShareGlyph size={11} color={theme.accent} />
+              <span style={{ fontSize: 9, fontWeight: 700, color: theme.accent, whiteSpace: 'nowrap' }}>Save or share</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -439,8 +561,10 @@ const filtered = base.filter((ev) => {
               <EventCard
                 key={ev.id}
                 event={ev}
+                theme={theme}
                 onSelect={openOfficial}
                 onDirections={openDirections}
+                onShare={shareEvent}
                 isEditorPick={ev.isEditorPick}
                 isPlayground={ev.category === 'Playground'}
               />
@@ -452,7 +576,7 @@ const filtered = base.filter((ev) => {
         <>
           <div style={{ fontSize: 9, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '8px 16px 6px', borderTop: '0.5px solid #E2DDD6' }}>Past events</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px', opacity: 0.5 }}>
-            {past.map((ev) => <EventCard key={ev.id} event={ev} onSelect={openOfficial} onDirections={openDirections} />)}
+            {past.map((ev) => <EventCard key={ev.id} event={ev} theme={theme} onSelect={openOfficial} onDirections={openDirections} onShare={shareEvent} />)}
           </div>
         </>
       )}
@@ -478,18 +602,18 @@ const filtered = base.filter((ev) => {
 
       {/* Floating list/map toggle. An add-on to the list, never a replacement —
           the list stays the default view on every load. */}
-      {!loading && mappable.length > 0 && !drawerOpen && !showMap && (
+      {!loading && mappable.length > 0 && !drawerOpen && !showMap && !openEvent && !shareTarget && (
         <button
           onClick={() => setShowMap(true)}
           style={{
             position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 22, zIndex: 950,
-            display: 'flex', alignItems: 'center', gap: 7, background: '#2D2D2D', color: 'white',
-            border: 'none', borderRadius: 50, padding: '11px 20px', fontSize: 12, fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: 8, background: '#2D2D2D', color: 'white',
+            border: '2.5px solid white', borderRadius: 50, padding: '13px 24px', fontSize: 14, fontWeight: 700,
             fontFamily: "'DM Sans', sans-serif", cursor: 'pointer',
-            boxShadow: '0 5px 18px rgba(0,0,0,0.3)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.34)',
           }}
         >
-          🗺 Map · {mappable.length}
+          🗺 Show map · {mappable.length}
         </button>
       )}
 
@@ -503,6 +627,27 @@ const filtered = base.filter((ev) => {
       )}
 
       <FilterDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} region={region} setRegion={setRegion} freeOnly={freeOnly} setFreeOnly={setFreeOnly} />
+
+      {/* What a shared link lands on. Only mounts once the row it names has
+          actually loaded, so a bad or stale id just shows the normal list. */}
+      <EventSheet
+        event={openEvent}
+        theme={theme}
+        onClose={() => setOpenEventId(null)}
+        onSelect={openOfficial}
+        onDirections={openDirections}
+        onShare={shareEvent}
+      />
+
+      <ShareSheet
+        open={!!shareTarget}
+        onClose={() => { setShareTarget(null); setCopied(false) }}
+        heading={sharePayload?.heading}
+        subheading={sharePayload?.subheading}
+        url={sharePayload?.url}
+        tiles={shareTiles}
+        copied={copied}
+      />
     </div>
   )
 }

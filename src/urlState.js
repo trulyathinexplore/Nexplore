@@ -3,7 +3,7 @@
 const slug = (s) => s.toLowerCase().replace(/\s+/g, '-')
 
 export const DEFAULTS = {
-  pill: 'All', region: null, free: false, weekend: false, month: true, amenities: [], q: '',
+  pill: 'All', region: null, free: false, weekend: false, month: true, amenities: [], q: '', event: null,
 }
 
 export function readFilters(search, pillLabels, regions) {
@@ -17,6 +17,9 @@ export function readFilters(search, pillLabels, regions) {
     month: p.get('month') !== '0', // June default on unless explicitly off
     amenities: (p.get('amenities') || '').split(',').map((s) => s.trim()).filter(Boolean),
     q: p.get('q') || '',
+    // Set by a shared link. App.jsx opens the event sheet over the list when
+    // this matches a loaded row, and clears it when the sheet is closed.
+    event: p.get('event') || null,
   }
 }
 
@@ -29,6 +32,9 @@ export function writeFilters(f) {
   if (!f.month) p.set('month', '0')
   if (f.amenities.length) p.set('amenities', f.amenities.join(','))
   if (f.q) p.set('q', f.q)
+  // Kept in the URL while the sheet is open so a refresh, or a bookmark taken
+  // mid-read, lands back on the same place.
+  if (f.event) p.set('event', f.event)
   const qs = p.toString()
   const url = qs ? `${location.pathname}?${qs}` : location.pathname
   window.history.replaceState(null, '', url)
