@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { resolveImage } from '../supabase.js'
 import { cardBg, REGIONS, themeFor } from '../constants.js'
 
@@ -163,17 +163,26 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
         {isEditorPick && (
           <div style={{ position: 'absolute', top: (event.free || displayPrice) ? 25 : 7, left: 7, background: '#C94F2C', color: 'white', fontSize: 7, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>✦ Pick</div>
         )}
+        {/* 34px circle sitting inside a 44px tap area. 44 is the accepted floor
+            for a touch target and the old 26px one was genuinely hard to hit.
+            The padding is transparent, so it costs nothing visually while
+            giving thumbs the room they need. */}
         {onShare && (
           <div
             onClick={(e) => { e.stopPropagation(); onShare(event) }}
             title="Share"
             style={{
-              position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)',
+              position: 'absolute', top: 0, right: 0, width: 44, height: 44,
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
             }}
           >
-            <ShareGlyph size={13} color="#2D2D2D" />
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.95)', boxShadow: '0 1px 6px rgba(0,0,0,0.24)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <ShareGlyph size={16} color="#2D2D2D" />
+            </div>
           </div>
         )}
         {isPlayground && (
@@ -338,6 +347,29 @@ function Tile({ label, bg, ring, children, onClick }) {
 // The destinations are built by src/share.js; this component only lays them
 // out. `tiles` arrives as [{ key, label, bg, ring, icon, run }].
 export function ShareSheet({ open, onClose, heading, subheading, url, tiles, copied }) {
+  // Scrolling the list behind the sheet dismisses it. Tapping the backdrop
+  // already did, but a sheet that hangs around while the page moves under it
+  // reads as stuck.
+  //
+  // onClose is an inline arrow in App.jsx, so it is a new function every
+  // render. Holding it in a ref keeps the effect from re-subscribing (and
+  // resetting `start`) on renders that happen while the sheet is open.
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+
+  useEffect(() => {
+    if (!open) return
+    const start = window.scrollY
+    // A threshold, because iOS fires a scroll event for rubber-band overscroll
+    // and for the address bar collapsing, neither of which is the user
+    // scrolling away.
+    const onScroll = () => {
+      if (Math.abs(window.scrollY - start) > 12) closeRef.current()
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [open])
+
   if (!open) return null
   return (
     <div
@@ -385,6 +417,12 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
   const amenityTags = (event.tags || []).filter((t) => t.tag_group === 'amenity')
   const pretty = (s) => s.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
 
+  const endsAt = event.endDate ? new Date(event.endDate + 'T23:59:59') : null
+  const hasEnded = !!endsAt && !Number.isNaN(endsAt.getTime()) && endsAt < new Date()
+  const endedLabel = hasEnded
+    ? endsAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : ''
+
   return (
     <div
       onClick={onClose}
@@ -404,9 +442,11 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
           </div>
           <div
             onClick={() => onShare(event)}
-            style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            style={{ position: 'absolute', top: 4, right: 4, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
           >
-            <ShareGlyph size={14} color="#2D2D2D" />
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.95)', boxShadow: '0 1px 6px rgba(0,0,0,0.24)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShareGlyph size={16} color="#2D2D2D" />
+            </div>
           </div>
         </div>
 
@@ -415,6 +455,14 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
           <div style={{ fontSize: 11, color: '#888880', marginTop: 4 }}>
             {event.city || event.area}{event.price ? ` · ${event.price}` : event.free ? ' · Free' : ''}
           </div>
+
+          {/* A link shared in October gets opened in December. Say so plainly
+              rather than letting someone drive to a closed pumpkin patch. */}
+          {hasEnded && (
+            <div style={{ display: 'inline-block', marginTop: 9, background: '#F2EFEA', color: '#7a746d', fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 10 }}>
+              This ran until {endedLabel}
+            </div>
+          )}
 
           {amenityTags.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>

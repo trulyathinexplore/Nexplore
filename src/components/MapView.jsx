@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { EventCard } from './ui.jsx'
+import { EventCard, ShareGlyph } from './ui.jsx'
 
 // Leaflet + CARTO basemap tiles. No API key, no account, no billing.
 //
@@ -87,7 +87,7 @@ function loadLeaflet() {
   return leafletPromise
 }
 
-export default function MapView({ events, onSelect, onDirections, onClose }) {
+export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme }) {
   const holder = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -148,6 +148,7 @@ export default function MapView({ events, onSelect, onDirections, onClose }) {
         // the selection the marker just made.
         if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent)
         setSelected(ev)
+        if (onPinClick) onPinClick(ev)
       })
       marker.addTo(map)
       markersRef.current.push(marker)
@@ -182,12 +183,37 @@ export default function MapView({ events, onSelect, onDirections, onClose }) {
           aria-label="Back to list"
           style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #E2DDD6', background: '#F7F4EF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, fontSize: 15, color: '#2D2D2D', lineHeight: 1, padding: 0, fontFamily: 'inherit' }}
         >‹</button>
-        <div>
+        <div style={{ flexGrow: 1, minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#2D2D2D' }}>Map</div>
           <div style={{ fontSize: 9, color: '#888880', marginTop: 1 }}>
             {plotted.length} on the map{missing > 0 ? ` · ${missing} without a location` : ''}
           </div>
         </div>
+
+        {/* Same toggle, same place as on the list, so getting in and out of
+            the map never moves under the thumb. The floating List pill lower
+            down stays as well: this is the deliberate second route back. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'white', border: '0.5px solid #E2DDD6', borderRadius: 20, padding: 2, flexShrink: 0 }}>
+          <div
+            onClick={onClose}
+            style={{ padding: '4px 10px', borderRadius: 20, fontSize: 9, fontWeight: 500, color: '#888880', cursor: 'pointer' }}
+          >
+            List
+          </div>
+          <div style={{ padding: '4px 10px', borderRadius: 20, fontSize: 9, fontWeight: 700, background: '#2D2D2D', color: 'white', cursor: 'pointer' }}>
+            Map
+          </div>
+        </div>
+
+        {onShareView && (
+          <div
+            onClick={onShareView}
+            title="Share this map"
+            style={{ flexShrink: 0, width: 30, height: 30, borderRadius: '50%', background: theme ? theme.accentSoft : '#E8F5EE', border: '0.5px solid #E2DDD6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <ShareGlyph size={13} color={theme ? theme.accent : '#1A6B4A'} />
+          </div>
+        )}
       </div>
 
       {/* Canvas */}
@@ -252,8 +278,10 @@ export default function MapView({ events, onSelect, onDirections, onClose }) {
               <EventCard
                 key={selected.id}
                 event={selected}
+                theme={theme}
                 onSelect={onSelect}
                 onDirections={onDirections}
+                onShare={onShare}
                 isEditorPick={selected.isEditorPick}
                 isPlayground={selected.category === 'Playground'}
               />
