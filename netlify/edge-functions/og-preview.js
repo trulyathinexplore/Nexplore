@@ -48,13 +48,75 @@ const cleanDescription = (raw) => {
   return body.slice(0, 197).replace(/\s+\S*$/, '') + '...'
 }
 
+// Category previews. Without this, tapping "Save or share" produces a link
+// that previews as a bare "Nexplore" card saying nothing about the 37 pumpkin
+// patches behind it, which is most of the reason nobody taps.
+//
+// Deliberately a small hand-kept map rather than an import of PILLS: edge
+// functions run in Deno and cannot import from src/. Keep it in step with
+// constants.js when a pill is added. A slug missing from here degrades to the
+// generic preview, which is what happens today anyway.
+// `noun` is a Title Case plural because it lands straight after a number in a
+// preview card: "37 Pumpkin Patches", "16 Halloween Events". Using the pill's
+// own label instead produced "37 Halloween in the Bay Area".
+//
+// Filtering on category_id rather than the category NAME on purpose. A name
+// filter would have to reach into the embedded categories table, which needs
+// an !inner join in the select and fails silently without one. Ids verified
+// against live data: 2 Museum, 4 Playground, 14 Pumpkin Patch, 17 Fruit Picking.
+const VIEWS = {
+  'pumpkin-patches': { noun: 'Pumpkin Patches',     query: 'category_id=eq.14' },
+  'halloween':       { noun: 'Halloween Events',    query: 'seasonal_type=eq.halloween' },
+  'fruit-picking':   { noun: 'Fruit Picking Farms', query: 'category_id=eq.17' },
+  'playground':      { noun: 'Playgrounds',         query: 'category_id=eq.4' },
+  'museum':          { noun: 'Museums',             query: 'category_id=eq.2' },
+}
+
+const sbHeaders = { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
+
+async function viewPreview(url, slug, isMap) {
+  const view = VIEWS[slug]
+  if (!view) return null
+
+  let count = null
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/events?${view.query}&status=eq.published&select=id`,
+      { headers: { ...sbHeaders, Prefer: 'count=exact', Range: '0-0' } },
+    )
+    // content-range comes back as "0-0/37"; the total is what we want.
+    const range = res.headers.get('content-range')
+    if (range && range.includes('/')) {
+      const total = parseInt(range.split('/')[1], 10)
+      if (Number.isFinite(total)) count = total
+    }
+  } catch {
+    // A missing count is not worth losing the preview over.
+  }
+
+  const n = count === null ? '' : `${count} `
+  const title = isMap
+    ? `Map of ${n}${view.noun} in the Bay Area | Nexplore`
+    : `${n}${view.noun} in the Bay Area | Nexplore`
+  const desc = `Every one worth going to, sorted by cost, ages, parking and accessibility. Family adventures in your neighborhood.`
+  return { title, desc, image: new URL(FALLBACK_IMAGE, url.origin).href }
+}
+
 export default async (request, context) => {
   const url = new URL(request.url)
-  const id = url.searchParams.get('event')
-  if (!id) return
-
   const ua = request.headers.get('user-agent') || ''
   if (!CRAWLER.test(ua)) return
+
+  const id = url.searchParams.get('event')
+
+  // No single event, so this may still be a shared category or map link.
+  if (!id) {
+    const slug = url.searchParams.get('view')
+    if (!slug || !/^[a-z0-9-]{1,40}$/.test(slug)) return
+    const p = await viewPreview(url, slug, url.searchParams.get('map') === '1')
+    if (!p) return
+    return html(p.title, p.desc, p.image, url.origin + url.search)
+  }
 
   // A weird id should never become a Supabase query.
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return
@@ -64,7 +126,7 @@ export default async (request, context) => {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/events?id=eq.${encodeURIComponent(id)}&status=eq.published` +
         `&select=id,title,description,image_url,city,price_label,is_free&limit=1`,
-      { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } },
+      { headers: sbHeaders },
     )
     if (res.ok) ev = (await res.json())[0] || null
   } catch {
@@ -78,9 +140,14 @@ export default async (request, context) => {
     cleanDescription(ev.description) ||
     `${ev.title}${where}. Family adventures in your neighborhood.`
   const image = ev.image_url || new URL(FALLBACK_IMAGE, url.origin).href
-  const canonical = `${url.origin}/?event=${encodeURIComponent(ev.id)}`
 
-  const html = `<!doctype html>
+  // Keep the sharer's full query string, so the pill on the link survives into
+  // the canonical URL rather than being flattened back to a bare ?event=.
+  return html(title, desc, image, url.origin + url.search)
+}
+
+function html(title, desc, image, canonical) {
+  const body = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -99,17 +166,17 @@ export default async (request, context) => {
 <meta name="twitter:image" content="${escapeHtml(image)}">
 </head>
 <body>
-<h1>${escapeHtml(ev.title)}</h1>
+<h1>${escapeHtml(title)}</h1>
 <p>${escapeHtml(desc)}</p>
 <p><a href="${escapeHtml(canonical)}">Open on Nexplore</a></p>
 </body>
 </html>`
 
-  return new Response(html, {
+  return new Response(body, {
     headers: {
       'content-type': 'text/html; charset=utf-8',
       // Previews are cached hard by the chat apps anyway; a short edge cache
-      // keeps repeated shares of the same place off Supabase.
+      // keeps repeated shares of the same link off Supabase.
       'cache-control': 'public, max-age=300',
     },
   })
