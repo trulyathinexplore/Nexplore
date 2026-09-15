@@ -319,7 +319,15 @@ const filtered = base.filter((ev) => {
 
   const openDirections = (ev) => {
     trackEventClickThrough(ev.title, 'directions')
-    const q = encodeURIComponent(ev.fullAddress || ev.title)
+    // Send the NAME as well as the address. Given an address alone Google drops
+    // a pin on the mailing point, which for a farm is often a field edge rather
+    // than the entrance — searching "Lemos Farm, 12320 San Mateo Rd…" resolves
+    // to the actual business listing instead, the same result as Googling it.
+    // The address stays in the query so a name Google doesn't recognise (the
+    // pool events, say) still lands in the right place.
+    const q = encodeURIComponent(
+      ev.fullAddress ? `${ev.title}, ${ev.fullAddress}` : ev.title,
+    )
     window.open(`https://maps.google.com/?q=${q}`, '_blank')
   }
 
