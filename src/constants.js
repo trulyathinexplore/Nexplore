@@ -3,8 +3,11 @@
 // type: 'all' | 'eventType' | 'category' | 'tagGroup'
 // fixedAmenities (optional): a curated, always-shown sub-pill list. If absent,
 // sub-pills are computed dynamically from whatever tags exist on matching events (unchanged default behavior).
+// 'All' was removed deliberately. A bare nexplore.us now means the HOME page,
+// not "show me everything", so All had nothing left to do. Home is also what
+// gives search its reach across every category: no pill active means search
+// is unscoped, which is the one job All was still quietly doing.
 export const PILLS = [
-  { label: 'All',           type: 'all' },
   { label: 'Playground',    type: 'category',  value: 'Playground',
     fixedAmenities: ['free', 'parking-onsite', 'picnic-area', 'shaded', 'restrooms', 'splash-pad', 'wheelchair-accessible'] },
   { label: 'Events',        type: 'eventType', value: 'event' },

@@ -37,11 +37,29 @@ function viewSlug(label) {
   return encodeURIComponent(slug(label))
 }
 
-// A link to whatever the user is currently looking at: pill, region, amenity
-// chips and search are all already in the address bar, so the current URL IS
-// the shareable one.
-export function currentViewUrl() {
-  return typeof window !== 'undefined' ? window.location.href : ORIGIN()
+// A link to the category the user is looking at.
+//
+// Deliberately rebuilt from the pill rather than copied from the address bar.
+// The address bar carries region, amenity chips, search and the month filter
+// too, and sending those along means the recipient opens a list cut down to
+// four cards and assumes that is all there is. The filters are obvious enough
+// once they arrive; the catalogue is not.
+//
+// `map` is the one piece of view state that DOES travel, because a shared map
+// is a different thing from a shared list and the sharer chose it deliberately.
+export function viewUrl(pillLabel, isMap) {
+  const p = new URLSearchParams()
+  if (pillLabel) p.set('view', slug(pillLabel))
+  if (isMap) p.set('map', '1')
+  const qs = p.toString()
+  return qs ? `${ORIGIN()}/?${qs}` : `${ORIGIN()}/`
+}
+
+// A link to one section of the home page. A query param rather than a #hash
+// because a hash never reaches the server, so a #fall link would preview as
+// the generic home card.
+export function sectionUrl(section) {
+  return `${ORIGIN()}/?section=${encodeURIComponent(section)}`
 }
 
 export function eventShareText(ev) {

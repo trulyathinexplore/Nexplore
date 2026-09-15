@@ -13,10 +13,11 @@ import {
   ShareSheet, EventSheet, ShareGlyph,
 } from './components/ui.jsx'
 import {
-  eventUrl, currentViewUrl, eventShareText, viewShareText,
+  eventUrl, viewUrl, eventShareText, viewShareText,
   targets, copyLink, canNativeShare, nativeShare,
 } from './share.js'
 import MapView from './components/MapView.jsx'
+import Home from './components/Home.jsx'
 const PILL_LABELS = PILLS.map((p) => p.label)
 
 // Which pills offer the map. 66 non-pumpkin rows (playgrounds, waterfronts,
@@ -96,6 +97,10 @@ export default function App() {
   const [copied, setCopied] = useState(false)
   // The id from ?event= on a shared link, held until the sheet is closed.
   const [openEventId, setOpenEventId] = useState(init.event)
+  // Held in state rather than re-read from the URL each render, because
+  // writeFilters rewrites the address bar and anything not carried there is
+  // gone by the second render.
+  const [section] = useState(init.section)
 
   // Calculate current and next 2 months dynamically
   const getCurrentAndNextMonths = () => {
@@ -131,13 +136,13 @@ export default function App() {
   }, [freeOnly])
 
   useEffect(() => {
-    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap })
-  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap])
+    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap, section })
+  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap, section])
 
   // A real page_view per category. Without this GA sees one page_view for the
   // whole visit and every standard report collapses the site into a single
   // page, which is why per-category visits were not measurable at all.
-  useEffect(() => { trackCategoryView(pill) }, [pill])
+  useEffect(() => { trackCategoryView(pill || 'Home') }, [pill])
 
   // Someone arrived through a shared link. ?event= is produced by nothing but
   // share, so it needs no tracking parameter to be recognisable.
@@ -186,12 +191,45 @@ export default function App() {
     }
   }, [])
 
-  const activePill = PILLS.find((p) => p.label === pill) || PILLS[0]
+  // null when no pill is chosen, which is the HOME state. matchesPill treats a
+  // null pill as "everything", which is what makes search from home reach
+  // across every category — the one job the All pill was still doing.
+  const activePill = pill ? (PILLS.find((p) => p.label === pill) || null) : null
+
+  // Home is showing unless a pill is chosen OR the user has typed a search.
+  // Typing into the search box from home drops you into unscoped results,
+  // rather than leaving you staring at the marketing page.
+  // openEventId excluded deliberately: a bare ?event= link should open its
+  // sheet over a list of things, not over the marketing page.
+  const isHome = !pill && !search.trim() && !openEventId
+
   // Resolves to the shared default for every pill except Pumpkin Patches.
-  const theme = themeFor(activePill.label)
-  const showAmenities = activePill.type === 'category' || activePill.type === 'tagGroup' || activePill.type === 'seasonalType'
+  const theme = themeFor(activePill?.label)
+
+  // A shared link pointing at a row that has since been unpublished or deleted
+  // lands on home rather than on a listless list. Only after loading finishes,
+  // so a valid link never flickers through the home page on its way in.
+  useEffect(() => {
+    if (loading || !openEventId) return
+    if (!events.some((ev) => String(ev.id) === String(openEventId))) setOpenEventId(null)
+  }, [loading, openEventId, events.length])
+
+  // ?section= deep links. Waits for the home page to exist before scrolling,
+  // which is the whole reason this is not a #hash: the browser resolves a hash
+  // before React has rendered, finds nothing and silently gives up.
+  //
+  // MUST stay below `isHome`. A dependency array is evaluated during render, so
+  // an effect declared above it throws "Cannot access 'isHome' before
+  // initialization" and white-screens the app. vite build compiles it happily;
+  // smoke.mjs is what catches it.
+  useEffect(() => {
+    if (!section || !isHome || loading) return
+    const el = document.getElementById(`section-${section}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [isHome, loading])
+  const showAmenities = activePill?.type === 'category' || activePill?.type === 'tagGroup' || activePill?.type === 'seasonalType'
   // Only show date/time chips when Events pill is active
-  const showDateChips = activePill.type === 'eventType'
+  const showDateChips = activePill?.type === 'eventType'
 
   function choosePill(label) {
     setPill(label)
@@ -202,9 +240,22 @@ export default function App() {
       trackPillClick(label)
     }
     const ap = PILLS.find((p) => p.label === label)
-    if (!(ap.type === 'category' || ap.type === 'tagGroup' || ap.type === 'seasonalType')) setAmenities([])
+    if (!(ap?.type === 'category' || ap?.type === 'tagGroup' || ap?.type === 'seasonalType')) setAmenities([])
     // Auto-deactivate month filter when leaving Events pill
-    if (ap.type !== 'eventType') setSelectedMonthFilter(null)
+    if (ap?.type !== 'eventType') setSelectedMonthFilter(null)
+  }
+
+  // Back to the front door, from the home pill or the wordmark. Clears every
+  // bit of view state, because arriving home with someone's old amenity chips
+  // still applied is the kind of thing that looks like a bug.
+  function goHome() {
+    setPill(null)
+    setSearch('')
+    setAmenities([])
+    setSelectedMonthFilter(null)
+    setShowMap(false)
+    setOpenEventId(null)
+    window.scrollTo(0, 0)
   }
 
   const toggleAmenity = (name) =>
@@ -270,7 +321,7 @@ export default function App() {
     // If no search keyword mapping, apply active pill normally
     if (!searchDetectedPill && !matchesPill(ev, activePill)) return false
     // If keyword mapped to a pill but user also has a pill selected (not All), still apply it
-    if (searchDetectedPill && activePill.type !== 'all' && !matchesPill(ev, activePill)) return false
+    if (searchDetectedPill && activePill && !matchesPill(ev, activePill)) return false
     if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
 
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
@@ -283,7 +334,7 @@ export default function App() {
 
   // Amenity sub-pills: use a fixed curated list if the active pill declares one (Playground, Water Play),
   // otherwise fall back to the original dynamic computation (Farm, Museum, County Fairs, etc. — unchanged)
-  const amenityOptions = activePill.fixedAmenities
+  const amenityOptions = activePill?.fixedAmenities
     ? activePill.fixedAmenities
     : [...new Set(
         base.flatMap((ev) => {
@@ -325,7 +376,7 @@ const filtered = base.filter((ev) => {
   // The Map button only earns its place when something can actually be plotted.
   // As coordinates land on other categories, it starts appearing there too,
   // with no further changes here.
-  const mapEnabled = MAP_ENABLED_PILLS.includes(activePill.label)
+  const mapEnabled = MAP_ENABLED_PILLS.includes(activePill?.label)
   const mappable = mapEnabled
     ? upcoming.filter((ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number')
     : []
@@ -402,6 +453,18 @@ const filtered = base.filter((ev) => {
     { label: '🏷 Free only', active: freeOnly, toggle: toggleFreeOnly },
   ]
 
+  // How many upcoming things sit behind a pill. Computed from the rows already
+  // in memory, so the home page needs no extra request and can never drift
+  // from what the list actually shows.
+  const countFor = (label) => {
+    const p = PILLS.find((x) => x.label === label)
+    if (!p) return 0
+    const today = new Date()
+    return events.filter((ev) =>
+      matchesPill(ev, p) && (!ev.endDate || new Date(ev.endDate + 'T23:59:59') >= today),
+    ).length
+  }
+
   // ---- Sharing ------------------------------------------------------------
   // A shared link can point at a row the current filters exclude, so look in
   // the full loaded set rather than in `upcoming`.
@@ -431,16 +494,16 @@ const filtered = base.filter((ev) => {
         const isMap = shareTarget.kind === 'map'
         const n = isMap ? mappable.length : upcoming.length
         return {
-          heading: pill === 'All' ? 'Things to do in the Bay Area' : pill,
+          heading: pill || 'Things to do in the Bay Area',
           subheading: isMap
             ? `${n} on the map · nexplore.us`
             : `${n} place${n !== 1 ? 's' : ''} · nexplore.us`,
-          // The address bar already carries the pill and the map flag, so the
-          // current URL IS the shareable one. Filters ride along here on
-          // purpose for a view share: the sharer chose to send this view.
-          url: currentViewUrl(),
+          // Rebuilt from the pill, NOT copied from the address bar. Region,
+          // amenity chips and search stay behind: a recipient opening a list
+          // cut down to four cards assumes that is the whole catalogue.
+          url: viewUrl(pill, isMap),
           text: viewShareText(pill, n, isMap),
-          subject: `Nexplore: ${pill === 'All' ? 'things to do' : pill}`,
+          subject: `Nexplore: ${pill || 'things to do'}`,
           label: `${isMap ? 'map' : 'view'}:${pill}`,
         }
       })()
@@ -503,7 +566,13 @@ const filtered = base.filter((ev) => {
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#F7F4EF' }}>
       {/* Header */}
       <div style={{ background: 'white', padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '0.5px solid #E2DDD6' }}>
-        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, letterSpacing: -0.5 }}>
+        {/* The wordmark is a home link, which is the convention on desktop
+            and half-invisible on a phone. The house pill below is the visible
+            version of the same thing; both exist on purpose. */}
+        <div
+          onClick={goHome}
+          style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, letterSpacing: -0.5, cursor: 'pointer' }}
+        >
           <span style={{ color: '#1A6B4A' }}>Ne</span><span style={{ color: '#C94F2C' }}>x</span><span style={{ color: '#1A6B4A' }}>plore</span>
         </div>
         <div style={{ fontSize: 10, color: '#888880', marginTop: 2, fontStyle: 'italic' }}>Family adventures in your neighborhood</div>
@@ -527,11 +596,30 @@ const filtered = base.filter((ev) => {
 
       {/* Category / theme pills */}
       <div style={{ display: 'flex', gap: 6, padding: '10px 0 0 16px', overflowX: 'auto' }}>
+        {/* Icon rather than the word HOME on purpose. In a row of word-pills an
+            icon reads as "not a category", which is exactly what it is. HOME
+            spelled out sits next to Playground and Beaches and recreates the
+            confusion the All pill had. */}
+        <div
+          onClick={goHome}
+          title="Home"
+          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 26, borderRadius: 20, border: `0.5px solid ${isHome ? '#1A6B4A' : '#E2DDD6'}`, background: isHome ? '#1A6B4A' : 'white', cursor: 'pointer' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isHome ? 'white' : '#888880'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3.5 10.5 12 3.5l8.5 7" />
+            <path d="M5.5 9.5V20h13V9.5" />
+            <path d="M9.8 20v-5.4h4.4V20" />
+          </svg>
+        </div>
         {PILLS.map((p) => (
           <div key={p.label} onClick={() => choosePill(p.label)} style={{ flexShrink: 0, fontSize: 10, fontWeight: 500, padding: '4px 12px', borderRadius: 20, border: `0.5px solid ${pill === p.label ? themeFor(p.label).pillActiveBorder : '#E2DDD6'}`, color: pill === p.label ? 'white' : '#888880', background: pill === p.label ? themeFor(p.label).pillActiveBg : 'white', cursor: 'pointer' }}>{p.label}</div>
         ))}
       </div>
 
+      {isHome ? (
+        <Home countFor={countFor} onPick={choosePill} />
+      ) : (
+        <>
       {/* Amenity sub-filters — only when category or Water Play active, excluding family-friendly */}
       {showAmenities && amenityOptions.length > 0 && (
         <div style={{ display: 'flex', gap: 6, padding: '8px 0 0 16px', overflowX: 'auto' }}>
@@ -701,6 +789,8 @@ const filtered = base.filter((ev) => {
           onPinClick={(ev) => trackMapPinClick(ev.title, pill)}
           onClose={() => setShowMap(false)}
         />
+      )}
+        </>
       )}
 
       <FilterDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} region={region} setRegion={setRegion} freeOnly={freeOnly} setFreeOnly={setFreeOnly} />
