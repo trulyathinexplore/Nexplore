@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
-import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor } from './constants.js'
+import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent } from './constants.js'
+import { sortClosedLast, isClosedForSeason } from './season.js'
 import {
   trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch,
   trackPageEngagement, trackJuly4thFilter, trackShare,
@@ -19,6 +20,21 @@ import {
 import MapView from './components/MapView.jsx'
 import Home from './components/Home.jsx'
 const PILL_LABELS = PILLS.map((p) => p.label)
+
+// The line shown when every result in a category is out of season. Kept here,
+// next to nothing else, so the copy is editable in one place without hunting
+// through JSX. Falls back to wording that works for any pill.
+const OUT_OF_SEASON_HEADLINES = {
+  'Pumpkin Patches': 'Pumpkin patches are done for the year.',
+  'Halloween': 'Halloween is over for this year.',
+  'Fruit Picking': 'Picking season has finished for now.',
+  'Boat Rides': 'Most boat rentals have closed for the season.',
+  'Water Play': 'Water play spots are closed for the season.',
+  'County Fairs': 'Fair season is over for this year.',
+}
+const outOfSeasonHeadline = (pillLabel) =>
+  OUT_OF_SEASON_HEADLINES[pillLabel] || 'These are closed for the season.'
+
 
 // Which pills offer the map. 66 non-pumpkin rows (playgrounds, waterfronts,
 // amusement parks) are linked to venues that already carry lat/lng, so without
@@ -360,8 +376,24 @@ const filtered = base.filter((ev) => {
   })
 
   const now = new Date()
-  const upcoming = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
+  const upcomingUnsorted = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
   const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
+
+  // Out-of-season venues drop to the bottom but stay visible, so a parent
+  // planning a spring trip still finds Vasona in March. Year-round rows are
+  // untouched, which today is everything outside Boat Rides.
+  const upcoming = sortClosedLast(upcomingUnsorted, now)
+
+  // Every single result is out of season: the season itself is over, and the
+  // list needs to say so rather than looking like a normal browsable page.
+  // Guarded on length so an empty list falls through to the existing empty
+  // state instead of claiming a season ended.
+  const allOutOfSeason =
+    upcoming.length > 0 && upcoming.every((ev) => isClosedForSeason(ev, now))
+
+  // No price and no FREE badge on pills where the units are not comparable.
+  // See HIDE_PRICE_PILLS in constants.js for why Boat Rides is on that list.
+  const hidePrice = hidesPrice(pill)
 
   // Which combinations come up empty, and what people searched for that we do
   // not have. Both fire on the rendered result rather than on keystrokes, so a
@@ -677,7 +709,7 @@ const filtered = base.filter((ev) => {
           never told anyone they were currently looking at a list. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 16px 6px' }}>
         <div style={{ fontSize: 9, fontWeight: 700, color: '#888880', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-          {loading ? 'Loading...' : `${upcoming.length} thing${upcoming.length !== 1 ? 's' : ''} to do`}
+          {loading ? 'Loading...' : countLabel(pill, upcoming.length)}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -714,7 +746,26 @@ const filtered = base.filter((ev) => {
         <div style={{ margin: '0 16px 10px', padding: '10px 14px', borderRadius: 10, background: '#FEF0E6', border: '0.5px solid #C94F2C', fontSize: 12, color: '#C94F2C' }}>⚠️ {error}</div>
       )}
 
-      {/* Grid */}
+      {/* The whole category is out of season. Say so plainly at the top rather
+          than letting a page of badged cards imply the site is broken. The
+          cards stay, because "where do we go when they're back" is a real
+          question in March. When RAG later wants a category hidden outright
+          rather than explained, this is where that switch goes. */}
+      {!loading && allOutOfSeason && (
+        <div style={{ margin: '0 16px 10px', padding: '10px 14px', borderRadius: 10, background: '#FEF0E6', border: '0.5px solid #EFCFB6' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#2D2D2D', marginBottom: 2 }}>
+            {outOfSeasonHeadline(pill)}
+          </div>
+          <div style={{ fontSize: 11, color: '#7A6A5C', lineHeight: 1.5 }}>
+            Here's where to go when they're back. Each one shows the month it reopens.
+          </div>
+        </div>
+      )}
+
+      {/* Grid.
+          hidePrice is resolved per EVENT as well as per pill: a search, or a
+          shared ?event= link, renders a mixed list with no pill active, and a
+          Boat Rides card must stay priceless in that list too. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px' }}>
         {loading
           ? [1, 2, 3, 4].map((i) => <EventCardSkeleton key={i} />)
@@ -728,6 +779,7 @@ const filtered = base.filter((ev) => {
                 onShare={shareEvent}
                 isEditorPick={ev.isEditorPick}
                 isPlayground={ev.category === 'Playground'}
+                hidePrice={hidePrice || hidesPriceForEvent(ev)}
               />
             ))}
       </div>
@@ -737,7 +789,7 @@ const filtered = base.filter((ev) => {
         <>
           <div style={{ fontSize: 9, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '8px 16px 6px', borderTop: '0.5px solid #E2DDD6' }}>Past events</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px', opacity: 0.5 }}>
-            {past.map((ev) => <EventCard key={ev.id} event={ev} theme={theme} onSelect={openOfficial} onDirections={openDirections} onShare={shareEvent} />)}
+            {past.map((ev) => <EventCard key={ev.id} event={ev} theme={theme} onSelect={openOfficial} onDirections={openDirections} onShare={shareEvent} hidePrice={hidePrice || hidesPriceForEvent(ev)} />)}
           </div>
         </>
       )}
@@ -788,6 +840,7 @@ const filtered = base.filter((ev) => {
           onShareView={shareMap}
           onPinClick={(ev) => trackMapPinClick(ev.title, pill)}
           onClose={() => setShowMap(false)}
+          hidePrice={hidePrice}
         />
       )}
         </>
@@ -797,6 +850,9 @@ const filtered = base.filter((ev) => {
 
       {/* What a shared link lands on. Only mounts once the row it names has
           actually loaded, so a bad or stale id just shows the normal list. */}
+      {/* hidePrice follows the EVENT's own category here, not just the active
+          pill. A shared ?event= link opens this sheet with no pill set at all,
+          and a Boat Rides venue must stay priceless however it was reached. */}
       <EventSheet
         event={openEvent}
         theme={theme}
@@ -804,6 +860,7 @@ const filtered = base.filter((ev) => {
         onSelect={openOfficial}
         onDirections={openDirections}
         onShare={shareEvent}
+        hidePrice={hidePrice || hidesPriceForEvent(openEvent)}
       />
 
       <ShareSheet

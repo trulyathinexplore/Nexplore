@@ -99,6 +99,12 @@ export function mapEvent(e) {
     // "Ages All ages" on every row that had no age_range set.
     ages: e.age_range || e.ages || '',
     needsReservation: e.registration_required || false,
+    // Seasonal window, as MM-DD strings. Both null means year-round, which is
+    // every row that predates this, so nothing changes until they are set.
+    // See season.js for how they are read. Stored without a year because a
+    // season recurs: a full date would need editing every January.
+    seasonStart: e.season_start || null,
+    seasonEnd: e.season_end || null,
     city,
     fullAddress,
     addressLine,
@@ -134,6 +140,11 @@ export function mapBeach(beach) {
     price: beach.free ? null : 'Day-use fee',
     ages: '', // beaches show no age chip
     needsReservation: false,
+    // Same shape as mapEvent, per the codebase notes: a key present in one and
+    // absent in the other becomes undefined on half the array. Beaches are
+    // year-round, so both are null and seasonState() says nothing about them.
+    seasonStart: null,
+    seasonEnd: null,
     city: beach.city,
     fullAddress: beach.fullAddress,
     addressLine: beach.fullAddress || null,

@@ -37,7 +37,82 @@ export const PILLS = [
   { label: 'Museum',        type: 'category',  value: 'Museum' },
   { label: 'Beaches',       type: 'category',  value: 'Beach',
     fixedAmenities: ['tidepool', 'parking-onsite', 'restrooms', 'wheelchair-accessible', 'free'] },
+  {
+    label: 'Boat Rides',
+    type: 'category',
+    value: 18,
+    // No price anywhere on these cards. See HIDE_PRICE_PILLS below — the units
+    // are not comparable, so a number on the card misleads rather than informs.
+    fixedAmenities: ['dog-friendly', 'wheelchair-accessible', 'open-year-round', 'kayaks', 'ferry'],
+  },
 ]
+
+// The count line above a list: "37 pumpkin patches to visit" rather than
+// "37 things to do". Generic wording tells a parent nothing; the category's
+// own noun tells them exactly what they are looking at.
+//
+// A noun alone is not enough, because the verb does not carry: "16 boat rides
+// to visit" is wrong. So both live here, per pill, in one place to edit.
+//
+// The nouns deliberately match the `noun` field in the edge function's VIEWS
+// map (netlify/edge-functions/og-preview.js), so a card and the link preview
+// of that same category agree with each other. Change one, change the other.
+//
+// `one` is the singular. "1 pumpkin patches to visit" is exactly the kind of
+// thing that ships and then irritates you for a month.
+const COUNT_WORDS = {
+  'Playground':      { one: 'playground',      many: 'playgrounds',      verb: 'to explore' },
+  'Events':          { one: 'event',           many: 'events',           verb: 'to check out' },
+  'Water Play':      { one: 'water play spot', many: 'water play spots', verb: 'to splash at' },
+  'Pumpkin Patches': { one: 'pumpkin patch',   many: 'pumpkin patches',  verb: 'to visit' },
+  'Halloween':       { one: 'Halloween event', many: 'Halloween events', verb: 'to check out' },
+  'Fruit Picking':   { one: 'farm',            many: 'farms',            verb: 'to visit' },
+  'Holiday Events':  { one: 'holiday event',   many: 'holiday events',   verb: 'to check out' },
+  'County Fairs':    { one: 'county fair',     many: 'county fairs',     verb: 'to visit' },
+  'Zoo & Aquarium':  { one: 'zoo & aquarium',  many: 'zoos & aquariums', verb: 'to explore' },
+  'Museum':          { one: 'museum',          many: 'museums',          verb: 'to explore' },
+  'Beaches':         { one: 'beach',           many: 'beaches',          verb: 'to visit' },
+  'Boat Rides':      { one: 'boat ride',       many: 'boat rides',       verb: 'to take' },
+}
+
+// Falls back to the old wording when a pill has no entry, so adding a pill
+// without touching this map degrades to "N things to do" rather than breaking.
+export function countLabel(pillLabel, n) {
+  const w = COUNT_WORDS[pillLabel]
+  if (!w) return `${n} thing${n !== 1 ? 's' : ''} to do`
+  return `${n} ${n === 1 ? w.one : w.many} ${w.verb}`
+}
+
+// Pills where a price on the card would mislead rather than inform.
+//
+// Boat Rides is the case that forced this. Its prices are not merely different
+// numbers, they are different UNITS: the Oakland ferry is $5.10 per person,
+// Edgewater's Whaly is $99 an hour for up to five people, and Boat Sausalito is
+// $399 for two hours for twelve. Rendering "$5" and "$99" side by side invites
+// a comparison that is simply false.
+//
+// It also keeps the site off stale fares. Ferry prices changed in July 2026 and
+// the Angel Island schedule changed in September; linking out to the operator
+// means Nexplore is never the thing quoting a wrong number.
+//
+// Pumpkin patch admission genuinely IS comparable, so it keeps its prices.
+export const HIDE_PRICE_PILLS = ['Boat Rides']
+export const hidesPrice = (pillLabel) => HIDE_PRICE_PILLS.includes(pillLabel)
+
+// The same question answered from an EVENT rather than the active pill.
+//
+// Needed because price suppression cannot be a property of the current view: a
+// search, or a shared ?event= link, renders a mixed list with no pill active at
+// all, and a Boat Rides card has to stay priceless wherever it appears.
+//
+// Derived from PILLS rather than hand-listed, so adding a pill to
+// HIDE_PRICE_PILLS is the only edit needed.
+const HIDE_PRICE_CATEGORY_VALUES = PILLS
+  .filter((p) => HIDE_PRICE_PILLS.includes(p.label) && p.type === 'category')
+  .flatMap((p) => (Array.isArray(p.value) ? p.value : [p.value]))
+
+export const hidesPriceForEvent = (ev) =>
+  !!ev && HIDE_PRICE_CATEGORY_VALUES.some((v) => v === ev.categoryId || v === ev.category)
  
 export const REGIONS = ['San Francisco', 'East Bay', 'South Bay', 'Peninsula', 'North Bay', 'Tri-Valley']
  
