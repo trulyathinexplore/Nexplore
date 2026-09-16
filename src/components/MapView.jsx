@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { EventCard, ShareGlyph } from './ui.jsx'
+import { hidesPriceForEvent } from '../constants.js'
 
 // Leaflet + CARTO basemap tiles. No API key, no account, no billing.
 //
@@ -87,7 +88,11 @@ function loadLeaflet() {
   return leafletPromise
 }
 
-export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme }) {
+// hidePrice threads through to the pin card for the same reason onShare and
+// theme do: this is the SAME EventCard the list renders, so anything the list
+// suppresses the map must suppress too. Forgetting to pass a prop here is
+// exactly how the map pin card once shipped without its share button.
+export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, hidePrice = false }) {
   const holder = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -284,6 +289,7 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
                 onShare={onShare}
                 isEditorPick={selected.isEditorPick}
                 isPlayground={selected.category === 'Playground'}
+                hidePrice={hidePrice || hidesPriceForEvent(selected)}
               />
             </div>
           </div>

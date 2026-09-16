@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { resolveImage } from '../supabase.js'
 import { cardBg, REGIONS, themeFor } from '../constants.js'
+import { seasonState } from '../season.js'
 
 export function SearchIcon() {
   return (
@@ -90,7 +91,7 @@ export function EventCardSkeleton() {
   )
 }
 
-export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, isPlayground, theme = themeFor(null) }) {
+export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, isPlayground, theme = themeFor(null), hidePrice = false }) {
   // Show city name if available, otherwise fall back to area
   const locationLabel = event.city || event.area || 'Bay Area'
 
@@ -129,8 +130,19 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
   return null
 }
 
-  const displayPrice = extractPrice()
+  // hidePrice short-circuits BOTH the price_label column and the regex above
+  // that scrapes a "$12" out of the description. Clearing price_label alone
+  // would not be enough: any Boat Rides description mentioning a dollar figure
+  // would quietly reappear as "From $12" on the card.
+  const displayPrice = hidePrice ? null : extractPrice()
   const dateRange = formatDateRange()
+
+  // Seasonal state drives two badges, site-wide. Year-round rows (both season
+  // columns null, which is everything that predates this) return 'year-round'
+  // and render nothing at all.
+  const season = seasonState(event)
+  const isClosedSeason = season.state === 'closed'
+  const isClosingSoon = season.state === 'closing-soon'
 
   // Only show the age chip for a real range like "5–12" or "4+".
   // "All ages" says nothing and used to render literally as "Ages All ages".
@@ -153,11 +165,30 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
         ) : (
           <EventImage event={event} height={150} />
         )}
-        {event.free ? (
+        {/* hidePrice takes the FREE badge with it. On a pill where cost is
+            deliberately not shown, a FREE badge on one card and silence on the
+            rest reads as an inconsistency rather than as information. */}
+        {!hidePrice && event.free ? (
           <div style={{ position: 'absolute', top: 7, left: 7, background: theme.freeBadgeBg, color: theme.freeBadgeFg, fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5, boxShadow: theme.freeBadgeBg === 'white' ? '0 1px 4px rgba(0,0,0,0.2)' : 'none' }}>FREE</div>
         ) : displayPrice ? (
           <div style={{ position: 'absolute', top: 7, left: 7, background: '#2D2D2D', color: 'white', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>{displayPrice}</div>
         ) : null}
+        {/* Seasonal badge. Sits bottom-left rather than top-left so it never
+            fights the price or Pick badges, and is legible over any photo
+            because it carries its own solid background. */}
+        {(isClosedSeason || isClosingSoon) && (
+          <div style={{
+            position: 'absolute', bottom: 7, left: 7,
+            background: isClosedSeason ? 'rgba(45,45,45,0.92)' : '#C94F2C',
+            color: 'white', fontSize: 8, fontWeight: 700,
+            padding: '3px 7px', borderRadius: 5,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+          }}>
+            {isClosedSeason
+              ? `CLOSED FOR THE SEASON${season.reopensMonth ? ` · BACK IN ${season.reopensMonth.toUpperCase()}` : ''}`
+              : `CLOSING SOON${season.closesMonth ? ` · ENDS ${season.closesMonth.toUpperCase()}` : ''}`}
+          </div>
+        )}
         {/* Pick moved to the left column. The top-right corner now belongs to
             Share, and the two used to sit on top of each other. */}
         {isEditorPick && (
@@ -403,7 +434,7 @@ export function ShareSheet({ open, onClose, heading, subheading, url, tiles, cop
 // What a shared link opens onto. Deliberately a sheet over the list rather than
 // a separate page: the recipient sees the one place their friend meant, and
 // closing it leaves them browsing everything else.
-export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null) }) {
+export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null), hidePrice = false }) {
   if (!event) return null
 
   // The emoji badge line at the end of a description is internal metadata that
@@ -422,6 +453,11 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
   const endedLabel = hasEnded
     ? endsAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : ''
+
+  // Declared here, ABOVE the return, deliberately. A value referenced in JSX
+  // but declared below it is the "Cannot access before initialization" white
+  // screen this codebase has hit before, and vite build compiles it silently.
+  const sheetSeason = seasonState(event)
 
   return (
     <div
@@ -453,7 +489,7 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
         <div style={{ padding: '14px 18px 0' }}>
           <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 700, color: '#2D2D2D', lineHeight: 1.25 }}>{event.title}</div>
           <div style={{ fontSize: 11, color: '#888880', marginTop: 4 }}>
-            {event.city || event.area}{event.price ? ` · ${event.price}` : event.free ? ' · Free' : ''}
+            {event.city || event.area}{hidePrice ? '' : event.price ? ` · ${event.price}` : event.free ? ' · Free' : ''}
           </div>
 
           {/* A link shared in October gets opened in December. Say so plainly
@@ -461,6 +497,20 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
           {hasEnded && (
             <div style={{ display: 'inline-block', marginTop: 9, background: '#F2EFEA', color: '#7a746d', fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 10 }}>
               This ran until {endedLabel}
+            </div>
+          )}
+
+          {/* Same reasoning as hasEnded above, for seasonal venues rather than
+              dated events. A link shared in September gets opened in March, and
+              a sheet that says nothing implies the place is open today. */}
+          {sheetSeason.state === 'closed' && (
+            <div style={{ display: 'inline-block', marginTop: 9, background: '#F2EFEA', color: '#7a746d', fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 10 }}>
+              Closed for the season{sheetSeason.reopensMonth ? ` · back in ${sheetSeason.reopensMonth}` : ''}
+            </div>
+          )}
+          {sheetSeason.state === 'closing-soon' && (
+            <div style={{ display: 'inline-block', marginTop: 9, background: '#FEF0E6', color: '#C94F2C', fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 10 }}>
+              Closing soon{sheetSeason.closesMonth ? ` · season ends in ${sheetSeason.closesMonth}` : ''}
             </div>
           )}
 
