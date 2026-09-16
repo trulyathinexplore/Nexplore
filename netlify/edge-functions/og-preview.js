@@ -70,6 +70,10 @@ const VIEWS = {
   'fruit-picking':   { noun: 'Fruit Picking Farms', query: 'category_id=eq.17' },
   'playground':      { noun: 'Playgrounds',         query: 'category_id=eq.4' },
   'museum':          { noun: 'Museums',             query: 'category_id=eq.2' },
+  // Keep these nouns in step with COUNT_WORDS in src/constants.js, so a card
+  // and the link preview of the same category say the same thing.
+  'boat-rides':      { noun: 'Boat Rides',          query: 'category_id=eq.18',
+    desc: 'Lake rentals, ferries and bay cruises across the Bay Area. Pedal boats and kayaks, the Sausalito and Angel Island ferries, and the ones that stay open all winter.' },
 }
 
 // Sections of the home page, shareable as ?section=. A query param rather than
@@ -119,7 +123,10 @@ async function viewPreview(url, slug, isMap) {
   const title = isMap
     ? `Map of ${n}${view.noun} in the Bay Area | Nexplore`
     : `${n}${view.noun} in the Bay Area | Nexplore`
-  const desc = `Every one worth going to, sorted by cost, ages, parking and accessibility. Family adventures in your neighborhood.`
+  // Boat Rides deliberately shows no cost anywhere in the app, so promising
+  // "sorted by cost" in its preview would be a promise the page does not keep.
+  const desc = view.desc
+    || `Every one worth going to, sorted by cost, ages, parking and accessibility. Family adventures in your neighborhood.`
   return { title, desc, image: new URL(FALLBACK_IMAGE, url.origin).href }
 }
 
