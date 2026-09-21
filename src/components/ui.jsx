@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { resolveImage } from '../supabase.js'
 import { cardBg, REGIONS, themeFor } from '../constants.js'
 import { seasonState } from '../season.js'
 
@@ -24,41 +23,64 @@ export function FilterIcon({ active }) {
   )
 }
 
+// Nine AI illustrations in public/placeholders/playground stand in for any
+// playground without its own photo. The image is picked from the park's id, so
+// the same park shows the same one in the list, when filtered, and on the map.
+const PLAYGROUND_PLACEHOLDERS = 9
+function placeholderFor(event) {
+  if (event.category !== 'Playground') return null
+  const n = Number(event.id)
+  let k = 0
+  if (Number.isFinite(n)) k = Math.abs(Math.trunc(n))
+  else for (const ch of String(event.id)) k = (k * 31 + ch.charCodeAt(0)) >>> 0
+  return `/placeholders/playground/playground-${String((k % PLAYGROUND_PLACEHOLDERS) + 1).padStart(2, '0')}.jpg`
+}
+
+// Photos in our own Supabase bucket are served through its resizer at 600px
+// wide: sharp on a retina phone card, a fraction of the original's weight.
+// Anything hosted elsewhere is left untouched, since the resizer can't reach it.
+const STORAGE_OBJECT = '/storage/v1/object/public/'
+export function sizedImageUrl(url, width = 600) {
+  if (!url || !url.includes(STORAGE_OBJECT)) return url
+  const resized = url.replace(STORAGE_OBJECT, '/storage/v1/render/image/public/')
+  return `${resized}${resized.includes('?') ? '&' : '?'}width=${width}&quality=75`
+}
+
+// aspectRatio (e.g. "4 / 5") is used for Playground cards; height (px) everywhere else.
+// Each image is tried in order: resized photo, original photo, playground
+// placeholder. Only when all of those fail does the letter tile appear.
 export function EventImage({ event, height, aspectRatio }) {
-  const [src, setSrc] = useState(event.imageUrl)
-  const [loading, setLoading] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const placeholder = placeholderFor(event)
+  const candidates = [...new Set([sizedImageUrl(event.imageUrl), event.imageUrl, placeholder].filter(Boolean))]
+  const [step, setStep] = useState(0)
+  const src = candidates[step]
+  const isPlaceholder = !!src && src === placeholder
 
-  useEffect(() => {
-    if (!src && !loading && !failed && event.officialUrl && event.officialUrl !== '#') {
-      setLoading(true)
-      resolveImage(event.officialUrl, event.id)
-        .then((s) => (s ? setSrc(s) : setFailed(true)))
-        .catch(() => setFailed(true))
-        .finally(() => setLoading(false))
-    }
-  }, [])
-
-  // aspectRatio (e.g. "4 / 5") is used for Playground cards; height (px) is used everywhere else, unchanged
   const sizeStyle = aspectRatio ? { width: '100%', aspectRatio } : { width: '100%', height }
 
-  if (src && !failed) {
+  if (src) {
     return (
-      <img
-        src={src}
-        alt={event.title}
-        onError={() => { setSrc(null); setFailed(true) }}
-        style={{ ...sizeStyle, objectFit: 'cover', display: 'block' }}
-      />
-    )
-  }
-  if (loading) {
-    return (
-      <div style={{
-        ...sizeStyle,
-        background: 'linear-gradient(90deg,#e8f5ee 25%,#d4e8da 50%,#e8f5ee 75%)',
-        backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite',
-      }} />
+      <>
+        <img
+          src={src}
+          alt={isPlaceholder ? '' : event.title}
+          loading="lazy"
+          decoding="async"
+          onError={() => setStep((n) => n + 1)}
+          style={{ ...sizeStyle, objectFit: 'cover', objectPosition: isPlaceholder ? 'center 35%' : 'center', display: 'block' }}
+        />
+        {/* Always shown on a placeholder so nobody mistakes it for a photo of
+            this park. Playground cards carry a title scrim along the bottom of
+            the image, so there the tag sits just above it. */}
+        {isPlaceholder && (
+          <div style={{
+            position: 'absolute', right: 7, bottom: aspectRatio ? 46 : 7,
+            background: 'rgba(20,20,20,0.72)', color: 'white',
+            fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10,
+            pointerEvents: 'none',
+          }}>AI illustration</div>
+        )}
+      </>
     )
   }
   return (
@@ -192,7 +214,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
         {/* Pick moved to the left column. The top-right corner now belongs to
             Share, and the two used to sit on top of each other. */}
         {isEditorPick && (
-          <div style={{ position: 'absolute', top: (event.free || displayPrice) ? 25 : 7, left: 7, background: '#C94F2C', color: 'white', fontSize: 7, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>✦ Pick</div>
+          <div style={{ position: 'absolute', top: (event.free || displayPrice) ? 25 : 7, left: 7, background: '#C94F2C', color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5 }}>✦ Top pick</div>
         )}
         {/* 34px circle sitting inside a 44px tap area. 44 is the accepted floor
             for a touch target and the old 26px one was genuinely hard to hit.

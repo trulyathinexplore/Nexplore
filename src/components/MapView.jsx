@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { EventCard, ShareGlyph } from './ui.jsx'
-import { hidesPriceForEvent } from '../constants.js'
+import { hidesPriceForEvent, pinStyleFor } from '../constants.js'
 
 // Leaflet + CARTO basemap tiles. No API key, no account, no billing.
 //
@@ -41,21 +41,24 @@ const GREEN = '#1A6B4A'
 const TERRA = '#C94F2C'
 
 // encodeURIComponent, not btoa: the emoji glyph is multi-byte and btoa throws.
-function pinIcon(selected) {
-  const fill = selected ? TERRA : GREEN
+// Colour and icon come from pinStyleFor(pill) in constants.js, so each category
+// has its own pin. A selected pin keeps its category colour, goes darker and
+// larger, rather than switching to a different hue.
+function pinIcon(selected, pin) {
+  const fill = selected ? pin.selected : pin.color
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="42" viewBox="0 0 34 42">
     <path d="M17 41 L11 27 h12 Z" fill="#fff"/>
     <circle cx="17" cy="15" r="13" fill="#fff"/>
     <circle cx="17" cy="15" r="11" fill="${fill}"/>
-    <text x="17" y="20" font-size="13" text-anchor="middle">🎃</text>
+    <text x="17" y="20" font-size="13" text-anchor="middle">${pin.icon}</text>
   </svg>`
   return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg)
 }
 
-function leafletIcon(L, selected) {
+function leafletIcon(L, selected, pin) {
   const w = selected ? 40 : 34
   const h = selected ? 49 : 42
-  return L.icon({ iconUrl: pinIcon(selected), iconSize: [w, h], iconAnchor: [w / 2, h - 1] })
+  return L.icon({ iconUrl: pinIcon(selected, pin), iconSize: [w, h], iconAnchor: [w / 2, h - 1] })
 }
 
 // Cache the promise, not a boolean, so two near-simultaneous mounts share one
@@ -92,7 +95,7 @@ function loadLeaflet() {
 // theme do: this is the SAME EventCard the list renders, so anything the list
 // suppresses the map must suppress too. Forgetting to pass a prop here is
 // exactly how the map pin card once shipped without its share button.
-export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, hidePrice = false }) {
+export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, pin = pinStyleFor(null), hidePrice = false }) {
   const holder = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -146,7 +149,7 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
     markersRef.current = []
 
     plotted.forEach((ev) => {
-      const marker = L.marker([ev.lat, ev.lng], { icon: leafletIcon(L, false), title: ev.title, riseOnHover: true })
+      const marker = L.marker([ev.lat, ev.lng], { icon: leafletIcon(L, false, pin), title: ev.title, riseOnHover: true })
       marker.__eventId = ev.id
       marker.on('click', (e) => {
         // Without this the click also reaches the map and immediately clears
@@ -165,7 +168,7 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
       map.fitBounds(L.latLngBounds(plotted.map((ev) => [ev.lat, ev.lng])), { padding: [40, 40] })
     }
     setSelected(null)
-  }, [status, events])
+  }, [status, events, pin])
 
   // Recolour in place: rebuilding the whole marker set on every tap would make
   // the map flicker and drop the tap target out from under the finger.
@@ -174,10 +177,10 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
     if (status !== 'ready' || !L) return
     markersRef.current.forEach((m) => {
       const on = selected && m.__eventId === selected.id
-      m.setIcon(leafletIcon(L, on))
+      m.setIcon(leafletIcon(L, on, pin))
       m.setZIndexOffset(on ? 1000 : 0)
     })
-  }, [selected, status])
+  }, [selected, status, pin])
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 900, background: '#E8E4DC', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>

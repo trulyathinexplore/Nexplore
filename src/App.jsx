@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
-import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent } from './constants.js'
+import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent, pinStyleFor } from './constants.js'
 import { sortClosedLast, isClosedForSeason } from './season.js'
 import {
   trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch,
@@ -40,7 +40,7 @@ const outOfSeasonHeadline = (pillLabel) =>
 // amusement parks) are linked to venues that already carry lat/lng, so without
 // this gate the Map button turns up on almost every pill. Add a label here when
 // a category is ready to be mapped.
-const MAP_ENABLED_PILLS = ['Pumpkin Patches']
+const MAP_ENABLED_PILLS = ['Pumpkin Patches', 'Playground']
 const REGION_LABELS = Object.keys(REGION_CITIES)
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
 const getAmenityLabel = (id) => AMENITY_LABELS[id] || prettify(id)
@@ -414,7 +414,7 @@ const filtered = base.filter((ev) => {
     : []
 
   // Back-fill coordinates for anything that has a street address but no
-  // lat/lng, the same way resolveImage back-fills a missing cover photo. The
+  // lat/lng, looked up once and written back. The
   // result is written to Supabase, so each row is geocoded once ever and an
   // address added in the admin tool becomes a pin on its own.
   //
@@ -834,6 +834,7 @@ const filtered = base.filter((ev) => {
         <MapView
           events={mappable}
           theme={theme}
+          pin={pinStyleFor(activePill?.label)}
           onSelect={openOfficial}
           onDirections={openDirections}
           onShare={shareEvent}

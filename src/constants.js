@@ -275,3 +275,26 @@ const PILL_THEMES = { 'Pumpkin Patches': PUMPKIN_THEME }
 export function themeFor(pillLabel) {
   return PILL_THEMES[pillLabel] || DEFAULT_THEME
 }
+
+// ---------------------------------------------------------------------------
+// Map pin per category. Defined for every pill so maps stay consistent as more
+// categories get one, but only the pills in MAP_ENABLED_PILLS (App.jsx) show a
+// map today. Fruit Picking is deliberately left on the default until decided.
+// ---------------------------------------------------------------------------
+const DEFAULT_PIN = { color: '#1A6B4A', selected: '#124D35', icon: '📍' }
+const PIN_STYLES = {
+  'Playground':      { color: '#7A4BB5', selected: '#553286', icon: '🛝' },
+  'Pumpkin Patches': { color: '#C94F2C', selected: '#963A20', icon: '🎃' },
+  'Halloween':       { color: '#2D2D2D', selected: '#000000', icon: '👻' },
+  'Water Play':      { color: '#2A7BC0', selected: '#1B5A8F', icon: '💦' },
+  'Beaches':         { color: '#1E9A9A', selected: '#136F6F', icon: '🏖' },
+  'Boat Rides':      { color: '#1F3A6B', selected: '#12254A', icon: '⛵' },
+  'Zoo & Aquarium':  { color: '#8A5A2B', selected: '#633F1C', icon: '🦁' },
+  'Museum':          { color: '#6B6B6B', selected: '#4A4A4A', icon: '🏛' },
+  'County Fairs':    { color: '#D0487A', selected: '#A03259', icon: '🎡' },
+  'Events':          { color: '#1A6B4A', selected: '#124D35', icon: '📅' },
+}
+
+export function pinStyleFor(pillLabel) {
+  return PIN_STYLES[pillLabel] || DEFAULT_PIN
+}

@@ -171,7 +171,7 @@ export function mapBeach(beach) {
  
 // Coordinates for an event that has a street address but no lat/lng yet.
 //
-// Same shape as resolveImage below: look it up once, write it straight back to
+// Look it up once, write it straight back to
 // Supabase, and never look it up again. So an address typed into the admin tool
 // turns into a pin by itself, and the row is only ever geocoded one time in its
 // life no matter how many people view it.
@@ -218,29 +218,6 @@ export async function resolveCoords(addressLine, id) {
     return pair
   } catch {
     coordCache[addressLine] = null
-    return null
-  }
-}
-
-// Microlink image resolution with in-memory cache + write-back to Supabase
-const imgCache = {}
-export async function resolveImage(officialUrl, id) {
-  if (!officialUrl || officialUrl === '#') return null
-  if (imgCache[officialUrl]) return imgCache[officialUrl]
-  try {
-    const r = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(officialUrl)}&meta=false`)
-    const j = await r.json()
-    const src = j?.data?.image?.url || j?.data?.logo?.url || null
-    if (src) {
-      imgCache[officialUrl] = src
-      fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: { ...headers, Prefer: 'return=minimal' },
-        body: JSON.stringify({ image_url: src }),
-      }).catch(() => {})
-    }
-    return src
-  } catch {
     return null
   }
 }
