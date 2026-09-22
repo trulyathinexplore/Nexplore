@@ -9,7 +9,7 @@
 // is unscoped, which is the one job All was still quietly doing.
 export const PILLS = [
   { label: 'Playground',    type: 'category',  value: 'Playground',
-    fixedAmenities: ['free', 'parking-onsite', 'picnic-area', 'shaded', 'restrooms', 'splash-pad', 'wheelchair-accessible'] },
+    fixedAmenities: ['free', 'restrooms', 'parking-onsite', 'splash-pad', 'toddler-area', 'inclusive-playground', 'reservable-picnic', 'bbq-grills', 'dog-friendly'] },
   { label: 'Events',        type: 'eventType', value: 'event' },
   { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature',
     fixedAmenities: ['free', 'waterparks', 'splash-pad', 'swim-lakes', 'fountain'] },
@@ -192,9 +192,17 @@ export const EXCLUDED_AMENITY_TAGS = ['family-friendly', 'family friendly']
  
 // Amenity emoji and label mapping for pumpkin patches
 export const AMENITY_LABELS = {
-  'dog-friendly': '🐕 Dog Friendly',
+  'free': '💚 Free',
+  'restrooms': '🚻 Restrooms',
+  'parking-onsite': '🅿️ Parking lot',
+  'splash-pad': '💦 Splash pad',
+  'toddler-area': '🧸 Toddler area',
+  'inclusive-playground': '♿ Inclusive',
+  'reservable-picnic': '🎉 Reservable picnic',
+  'bbq-grills': '🔥 BBQ grills',
+  'dog-friendly': '🐕 Dog friendly',
+  'picnic-area': '🧺 Picnic area',
   'wheelchair-accessible': '♿ Accessible',
-  'free': '💚 Free Admission',
   'rides-games': '🎡 Rides & Games'
 }
  

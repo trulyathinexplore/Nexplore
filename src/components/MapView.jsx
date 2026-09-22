@@ -257,9 +257,9 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
           <button
             onClick={onClose}
             style={{
-              position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 26, zIndex: 600,
+              position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 22, zIndex: 600,
               display: 'flex', alignItems: 'center', gap: 7, background: '#2D2D2D', color: 'white',
-              border: 'none', borderRadius: 50, padding: '11px 20px', fontSize: 12, fontWeight: 700,
+              border: '2.5px solid white', borderRadius: 50, padding: '13px 24px', fontSize: 14, fontWeight: 700,
               fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', boxShadow: '0 5px 18px rgba(0,0,0,0.3)',
             }}
           >
@@ -291,7 +291,6 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
                 onDirections={onDirections}
                 onShare={onShare}
                 isEditorPick={selected.isEditorPick}
-                isPlayground={selected.category === 'Playground'}
                 hidePrice={hidePrice || hidesPriceForEvent(selected)}
               />
             </div>

@@ -23,6 +23,14 @@ export function FilterIcon({ active }) {
   )
 }
 
+// Playground info line, in display order: [tag name, label, background, text].
+const PLAYGROUND_INFO_LINE = [
+  ['inclusive-playground', '♿ Inclusive', '#EFE8F8', '#5A3593'],
+  ['restrooms', '🚻 Restrooms', '#E8F5EE', '#1A6B4A'],
+  ['parking-onsite', '🅿️ Lot', '#E8F5EE', '#1A6B4A'],
+  ['splash-pad', '💦 Splash pad', '#E8F5EE', '#1A6B4A'],
+]
+
 // Nine AI illustrations in public/placeholders/playground stand in for any
 // playground without its own photo. The image is picked from the park's id, so
 // the same park shows the same one in the list, when filtered, and on the map.
@@ -43,7 +51,7 @@ const STORAGE_OBJECT = '/storage/v1/object/public/'
 export function sizedImageUrl(url, width = 600) {
   if (!url || !url.includes(STORAGE_OBJECT)) return url
   const resized = url.replace(STORAGE_OBJECT, '/storage/v1/render/image/public/')
-  return `${resized}${resized.includes('?') ? '&' : '?'}width=${width}&quality=75`
+  return `${resized}${resized.includes('?') ? '&' : '?'}width=${width}&quality=75&resize=contain`
 }
 
 // aspectRatio (e.g. "4 / 5") is used for Playground cards; height (px) everywhere else.
@@ -113,7 +121,7 @@ export function EventCardSkeleton() {
   )
 }
 
-export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, isPlayground, theme = themeFor(null), hidePrice = false }) {
+export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false }) {
   // Show city name if available, otherwise fall back to area
   const locationLabel = event.city || event.area || 'Bay Area'
 
@@ -170,6 +178,18 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
   // "All ages" says nothing and used to render literally as "Ages All ages".
   const showAges = !!event.ages && event.ages.trim().toLowerCase() !== 'all ages'
 
+  // The info line under the title. Ages and reservations for every card; for
+  // playgrounds also the few amenities that decide a trip, only when present.
+  const tagNames = new Set((event.tags || []).map((t) => t.name))
+  const chips = []
+  if (showAges) chips.push({ key: 'ages', label: `Ages ${event.ages}`, bg: '#E8F5EE', fg: '#1A6B4A' })
+  if (event.needsReservation) chips.push({ key: 'res', label: '🎟 Reservation required', bg: '#FEF0E6', fg: '#C94F2C' })
+  if (event.category === 'Playground') {
+    for (const [name, label, bg, fg] of PLAYGROUND_INFO_LINE) {
+      if (tagNames.has(name)) chips.push({ key: name, label, bg, fg })
+    }
+  }
+
   return (
     <div
       style={{
@@ -182,11 +202,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
     >
       {/* Image — clicking image opens official URL */}
       <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => onSelect(event)}>
-        {isPlayground ? (
-          <EventImage event={event} aspectRatio="4 / 5" />
-        ) : (
-          <EventImage event={event} height={150} />
-        )}
+        <EventImage event={event} height={150} />
         {/* hidePrice takes the FREE badge with it. On a pill where cost is
             deliberately not shown, a FREE badge on one card and silence on the
             rest reads as an inconsistency rather than as information. */}
@@ -238,38 +254,9 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
             </div>
           </div>
         )}
-        {isPlayground && (
-          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', padding: '6px 8px' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {event.title}
-            </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {locationLabel}{displayPrice ? ` · ${displayPrice}` : ''}
-            </div>
-          </div>
-        )}
       </div>
 
-      <div style={{ padding: isPlayground ? '8px 10px' : '8px 10px 10px' }}>
-        {isPlayground ? (
-          /* Playground: title/location live on the scrim above, age tag removed, buttons unchanged */
-          <div style={{ display: 'flex', gap: 5 }}>
-            <div
-              onClick={(e) => { e.stopPropagation(); onDirections && onDirections(event) }}
-              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.dirBorder, background: theme.dirBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.dirFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              📍 Directions
-            </div>
-            <div
-              onClick={(e) => { e.stopPropagation(); onSelect(event) }}
-              style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.learnFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Learn more →
-            </div>
-          </div>
-        ) : (
-          /* All other cards: unchanged from before */
-          <>
+      <div style={{ padding: '8px 10px 10px' }}>
             {dateRange && (
               <div style={{ fontSize: 9, fontWeight: 700, color: theme.dateFg, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{dateRange}</div>
             )}
@@ -284,12 +271,12 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
               {locationLabel}{displayPrice ? ` · ${displayPrice}` : ''}
             </div>
 
-            {showAges && (
-              <div style={{ display: 'inline-block', background: '#E8F5EE', color: '#1A6B4A', fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, marginBottom: 7 }}>Ages {event.ages}</div>
-            )}
-
-            {event.needsReservation && (
-              <div style={{ display: 'inline-block', background: '#FEF0E6', color: '#C94F2C', fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, marginBottom: 7, marginLeft: showAges ? 4 : 0 }}>🎟 Reservation required</div>
+            {chips.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
+                {chips.map((c) => (
+                  <div key={c.key} style={{ background: c.bg, color: c.fg, fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10 }}>{c.label}</div>
+                ))}
+              </div>
             )}
 
             {/* Same two-button row the Playground cards use. Directions is
@@ -310,8 +297,6 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
                 Learn more →
               </div>
             </div>
-          </>
-        )}
       </div>
     </div>
   )

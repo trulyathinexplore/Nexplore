@@ -350,8 +350,11 @@ export default function App() {
 
   // Amenity sub-pills: use a fixed curated list if the active pill declares one (Playground, Water Play),
   // otherwise fall back to the original dynamic computation (Farm, Museum, County Fairs, etc. — unchanged)
+  // A fixed pill list hides any amenity no card in view has, so a tap never
+  // leads to an empty list. A pill the user already selected always stays.
+  const hasAmenity = (ev, a) => (a === 'free' ? ev.free === true : ev.tags.some((t) => t.name === a))
   const amenityOptions = activePill?.fixedAmenities
-    ? activePill.fixedAmenities
+    ? activePill.fixedAmenities.filter((a) => amenities.includes(a) || base.some((ev) => hasAmenity(ev, a)))
     : [...new Set(
         base.flatMap((ev) => {
           // Every pill reads amenities from tags. Pumpkin patches used to parse
@@ -657,7 +660,7 @@ const filtered = base.filter((ev) => {
         <div style={{ display: 'flex', gap: 6, padding: '8px 0 0 16px', overflowX: 'auto' }}>
         {amenityOptions.map((name) => {
   const on = amenities.includes(name)
-  const label = prettify(name)
+  const label = getAmenityLabel(name)
   return (
     <div key={name} onClick={() => toggleAmenity(name)} style={{ flexShrink: 0, fontSize: 10, fontWeight: on ? 600 : 500, padding: '4px 11px', borderRadius: 20, border: `0.5px solid ${on ? theme.chipOnBorder : '#E2DDD6'}`, color: on ? theme.chipOnFg : '#888880', background: on ? theme.chipOnBg : 'white', cursor: 'pointer' }}>{label}</div>
   )
@@ -778,7 +781,6 @@ const filtered = base.filter((ev) => {
                 onDirections={openDirections}
                 onShare={shareEvent}
                 isEditorPick={ev.isEditorPick}
-                isPlayground={ev.category === 'Playground'}
                 hidePrice={hidePrice || hidesPriceForEvent(ev)}
               />
             ))}
