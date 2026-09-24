@@ -11,7 +11,11 @@ export const PILLS = [
   { label: 'Playground',    type: 'category',  value: 'Playground',
     fixedAmenities: ['free', 'restrooms', 'parking-onsite', 'splash-pad', 'toddler-area', 'inclusive-playground', 'reservable-picnic', 'bbq-grills', 'dog-friendly'] },
   { label: 'Events',        type: 'eventType', value: 'event' },
-  { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature',
+  // hidden: the pill stays in this list so every link ever shared with
+  // ?view=Water%20Play still resolves and still filters correctly. It is only
+  // dropped from the pill ROW in App.jsx. Water play season is over; delete
+  // the flag to bring it back in May, no other change needed.
+  { label: 'Water Play',    type: 'tagGroup',  value: 'water-feature', hidden: true,
     fixedAmenities: ['free', 'waterparks', 'splash-pad', 'swim-lakes', 'fountain'] },
   {
     label: 'Pumpkin Patches',
@@ -32,7 +36,7 @@ export const PILLS = [
   { label: 'Fruit Picking',  type: 'category', value: 17,
     fixedAmenities: ['apple-picking'] },
   { label: 'Holiday Events', type: 'category', value: 16 },
-  { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair' },
+  { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair', hidden: true },
   { label: 'Zoo & Aquarium', type: 'category', value: ['Zoo', 'Aquarium']},
   { label: 'Museum',        type: 'category',  value: 'Museum' },
   { label: 'Beaches',       type: 'category',  value: 'Beach',
@@ -263,11 +267,14 @@ const PUMPKIN_THEME = {
   cardBorder: '1px solid #EFCFB6',
   freeBadgeBg: 'white',
   freeBadgeFg: '#2D2D2D',
+  // CTAs stay GREEN on every pill. Orange is the pumpkin pill's accent, not a
+  // button colour, and black buttons were the other half of the same problem.
+  // The pill chip, the date line and the amenity chips still carry the season.
   dirBg: 'white',
-  dirBorder: '0.5px solid #2D2D2D',
-  dirFg: '#2D2D2D',
-  learnBg: '#2D2D2D',
-  learnBorder: '0.5px solid #2D2D2D',
+  dirBorder: '0.5px solid #1A6B4A',
+  dirFg: '#1A6B4A',
+  learnBg: '#1A6B4A',
+  learnBorder: '0.5px solid #1A6B4A',
   learnFg: 'white',
   pillActiveBg: '#C94F2C',
   pillActiveBorder: '#C94F2C',

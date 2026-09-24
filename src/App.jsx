@@ -93,6 +93,10 @@ function isInMonth(startStr, key) {
   return monthKey(start.getUTCFullYear(), start.getUTCMonth() + 1) === key
 }
 
+// Off for this release. See the search bar block below for why, and flip this
+// to true to bring it back.
+const SHOW_SEARCH = false
+
 export default function App() {
   const init = readFilters(window.location.search, PILL_LABELS, REGION_LABELS)
   const [events, setEvents] = useState([])
@@ -104,6 +108,9 @@ export default function App() {
   const [weekend, setWeekend] = useState(init.weekend)
   const [month, setMonth] = useState(init.month)
   const [search, setSearch] = useState(init.q)
+  // Which card is open. One at a time on purpose: two open cards in a two
+  // column grid push each other around and nobody can follow what moved.
+  const [expandedId, setExpandedId] = useState(null)
   const [amenities, setAmenities] = useState(init.amenities)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedMonthFilter, setSelectedMonthFilter] = useState(null)
@@ -153,6 +160,8 @@ export default function App() {
 
   useEffect(() => {
     writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap, section })
+    // A card left open on one filter has no business being open on the next.
+    setExpandedId(null)
   }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap, section])
 
   // A real page_view per category. Without this GA sees one page_view for the
@@ -463,6 +472,18 @@ const filtered = base.filter((ev) => {
  const filterCount = [weekend, freeOnly, !!region, !!selectedMonthFilter].filter(Boolean).length + amenities.length
 
   // Click-through handlers with tracking
+  // Events tab only for this release. Every other pill keeps Learn more as a
+  // link out, which is right for a playground: there is nothing to expand into.
+  const canExpand = pill === 'Events'
+
+  const toggleExpand = (ev) => {
+    setExpandedId((cur) => {
+      const next = cur === ev.id ? null : ev.id
+      if (next) trackEventClickThrough(ev.title, 'expand')
+      return next
+    })
+  }
+
   const openOfficial = (ev) => {
     trackEventClickThrough(ev.title, 'learn_more')
     if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank')
@@ -613,21 +634,42 @@ const filtered = base.filter((ev) => {
         <div style={{ fontSize: 10, color: '#888880', marginTop: 2, fontStyle: 'italic' }}>Family adventures in your neighborhood</div>
       </div>
 
-      {/* Search bar */}
-      <div style={{ padding: '10px 16px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', background: 'white', borderRadius: 50, border: '1px solid #E2DDD6', padding: '0 6px 0 14px', height: 44, boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }}>
-          <SearchIcon />
-          <input
-            type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search events, parks, farms..."
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: '#2D2D2D', padding: '0 10px', fontFamily: "'DM Sans', sans-serif" }}
-          />
-          <div onClick={() => setDrawerOpen(true)} style={{ width: 34, height: 34, borderRadius: '50%', background: filterCount > 0 ? '#1A6B4A' : '#F7F4EF', border: `1px solid ${filterCount > 0 ? '#1A6B4A' : '#E2DDD6'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, position: 'relative' }}>
-            <FilterIcon active={filterCount > 0} />
-            {filterCount > 0 && <div style={{ position: 'absolute', top: -3, right: -3, width: 14, height: 14, borderRadius: '50%', background: '#C94F2C', color: 'white', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</div>}
+      {/* Search bar.
+          SHOW_SEARCH is off for this release. The box matched title and
+          description only, so "free events this weekend" and "near me" both
+          returned nothing, and a search box that fails on the obvious query
+          costs more trust than it earns. The state, the URL param and the
+          intent detection all stay wired up, so turning the flag back on is
+          the whole of bringing it back.
+
+          The filter button used to live INSIDE this bar, which means hiding the
+          bar would have taken the filter drawer with it. It moves out here
+          instead, and only on list pages, since there is nothing to filter on
+          home. */}
+      {SHOW_SEARCH ? (
+        <div style={{ padding: '10px 16px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', background: 'white', borderRadius: 50, border: '1px solid #E2DDD6', padding: '0 6px 0 14px', height: 44, boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }}>
+            <SearchIcon />
+            <input
+              type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search events, parks, farms..."
+              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: '#2D2D2D', padding: '0 10px', fontFamily: "'DM Sans', sans-serif" }}
+            />
+            <div onClick={() => setDrawerOpen(true)} style={{ width: 34, height: 34, borderRadius: '50%', background: filterCount > 0 ? '#1A6B4A' : '#F7F4EF', border: `1px solid ${filterCount > 0 ? '#1A6B4A' : '#E2DDD6'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, position: 'relative' }}>
+              <FilterIcon active={filterCount > 0} />
+              {filterCount > 0 && <div style={{ position: 'absolute', top: -3, right: -3, width: 14, height: 14, borderRadius: '50%', background: '#C94F2C', color: 'white', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</div>}
+            </div>
           </div>
         </div>
-      </div>
+      ) : !isHome ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 16px 0' }}>
+          <div onClick={() => setDrawerOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 20, background: filterCount > 0 ? '#1A6B4A' : 'white', border: `1px solid ${filterCount > 0 ? '#1A6B4A' : '#E2DDD6'}`, cursor: 'pointer', position: 'relative' }}>
+            <FilterIcon active={filterCount > 0} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: filterCount > 0 ? 'white' : '#888880' }}>Filters</span>
+            {filterCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, width: 15, height: 15, borderRadius: '50%', background: '#C94F2C', color: 'white', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</div>}
+          </div>
+        </div>
+      ) : null}
 
       {/* Category / theme pills */}
       <div style={{ display: 'flex', gap: 6, padding: '10px 0 0 16px', overflowX: 'auto' }}>
@@ -646,7 +688,7 @@ const filtered = base.filter((ev) => {
             <path d="M9.8 20v-5.4h4.4V20" />
           </svg>
         </div>
-        {PILLS.map((p) => (
+        {PILLS.filter((p) => !p.hidden).map((p) => (
           <div key={p.label} onClick={() => choosePill(p.label)} style={{ flexShrink: 0, fontSize: 10, fontWeight: 500, padding: '4px 12px', borderRadius: 20, border: `0.5px solid ${pill === p.label ? themeFor(p.label).pillActiveBorder : '#E2DDD6'}`, color: pill === p.label ? 'white' : '#888880', background: pill === p.label ? themeFor(p.label).pillActiveBg : 'white', cursor: 'pointer' }}>{p.label}</div>
         ))}
       </div>
@@ -768,22 +810,54 @@ const filtered = base.filter((ev) => {
       {/* Grid.
           hidePrice is resolved per EVENT as well as per pill: a search, or a
           shared ?event= link, renders a mixed list with no pill active, and a
-          Boat Rides card must stay priceless in that list too. */}
+          Boat Rides card must stay priceless in that list too.
+
+          EXPANSION, and why the `order` arithmetic is there.
+
+          Events only, for now. Learn more opens the card in place instead of
+          throwing someone out to a third-party site they then have to navigate
+          back from.
+
+          An open card spans both columns. That alone is fine for a card in the
+          LEFT column: it is already first in its row, so it widens and its
+          right-hand neighbour drops to the next row. A card in the RIGHT column
+          has no such luck, and would jump down a row to find the space, which
+          reads as the card you just tapped running away from your thumb.
+
+          So each card carries an explicit `order` of i * 2, leaving odd numbers
+          free between them. Opening a right-column card sets its order to
+          i * 2 - 3, which slots it BEFORE its left-hand neighbour: the open
+          card keeps the row it was already in, and the neighbour is the thing
+          that moves. Closing restores i * 2. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px' }}>
         {loading
           ? [1, 2, 3, 4].map((i) => <EventCardSkeleton key={i} />)
-          : upcoming.map((ev) => (
-              <EventCard
-                key={ev.id}
-                event={ev}
-                theme={theme}
-                onSelect={openOfficial}
-                onDirections={openDirections}
-                onShare={shareEvent}
-                isEditorPick={ev.isEditorPick}
-                hidePrice={hidePrice || hidesPriceForEvent(ev)}
-              />
-            ))}
+          : upcoming.map((ev, i) => {
+              const isOpen = canExpand && expandedId === ev.id
+              const claimsRow = isOpen && i % 2 === 1
+              return (
+                <div
+                  key={ev.id}
+                  style={{
+                    minWidth: 0,
+                    order: canExpand ? (claimsRow ? i * 2 - 3 : i * 2) : undefined,
+                    gridColumn: isOpen ? '1 / -1' : undefined,
+                  }}
+                >
+                  <EventCard
+                    event={ev}
+                    theme={theme}
+                    onSelect={openOfficial}
+                    onDirections={openDirections}
+                    onShare={shareEvent}
+                    isEditorPick={ev.isEditorPick}
+                    hidePrice={hidePrice || hidesPriceForEvent(ev)}
+                    expanded={isOpen}
+                    onToggleExpand={canExpand ? toggleExpand : null}
+                  />
+                </div>
+              )
+            })}
       </div>
 
       {/* Past events */}

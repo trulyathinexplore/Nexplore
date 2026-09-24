@@ -14,9 +14,9 @@
 // deliberate: nothing looks broken for the ones not filmed yet.
 
 export const FALL_COLOUR = {
-  title: 'Fall colour spots',
+  title: 'Fall color spots',
   when: 'Nov',
-  note: 'Tree-lined streets, parks and gardens where the colour actually turns.',
+  note: 'Tree-lined streets, parks and gardens where the color actually turns.',
   places: [
     { name: 'Palo Alto', meta: 'Bowdoin St, Martin Ave and Pitman Ave', reel: 'https://www.instagram.com/p/DRkMPGUkSNJ/' },
     { name: 'Downtown Los Altos', meta: '', reel: 'https://www.instagram.com/p/DPWcQBPETzU/' },
