@@ -25,12 +25,16 @@ import { FALL_COLOUR, WEEKEND_TRIPS } from '../fallLists.js'
 // clear subject, not scenery.
 // ---------------------------------------------------------------------------
 
+// `note` carries the TIMING and the button carries the COUNT. They used to
+// both carry the count, so a tile read "44 across the Bay" above a button
+// reading "See all 44". Timing is the half that makes someone go this weekend
+// rather than in three weeks, so it is the half that gets the line.
 const SEASONAL = [
-  { pill: 'Pumpkin Patches', name: 'Pumpkin Patches', note: 'across the Bay', photo: '/media/pumpkin.jpg', fallback: 'linear-gradient(150deg,#dd9448,#c2612f)' },
-  { pill: 'Fruit Picking', name: 'Apple Picking', note: 'farms, ends soon', photo: '/media/apple.jpg', fallback: 'linear-gradient(150deg,#8fb56a,#4a7c3f)' },
-  { pill: 'Halloween', name: 'Halloween', note: 'events in Oct', photo: '', fallback: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
-  { sheet: 'colour', name: 'Fall colour', note: 'spots, peaks Nov', count: FALL_COLOUR.places.length, photo: '/media/spots.jpg', fallback: 'linear-gradient(150deg,#e0a05c,#a8552c)' },
-  { sheet: 'trips', name: 'Weekend Trips', note: 'trips, best in Oct', count: WEEKEND_TRIPS.places.length, photo: '/media/trips.jpg', fallback: 'linear-gradient(150deg,#8fa8bd,#4a6377)' },
+  { pill: 'Pumpkin Patches', name: 'Pumpkin Patches', note: 'Across the Bay', word: 'the patches', photo: '/media/pumpkin.jpg', fallback: 'linear-gradient(150deg,#dd9448,#c2612f)' },
+  { pill: 'Fruit Picking', name: 'Apple Picking', note: 'Ends soon', word: 'the farms', photo: '/media/apple.jpg', fallback: 'linear-gradient(150deg,#8fb56a,#4a7c3f)' },
+  { pill: 'Halloween', name: 'Halloween', note: 'All through October', word: 'what is on', photo: '', fallback: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
+  { sheet: 'colour', name: 'Fall color', note: 'Peaks in November', word: 'the spots', count: FALL_COLOUR.places.length, photo: '/media/spots.jpg', fallback: 'linear-gradient(150deg,#e0a05c,#a8552c)' },
+  { sheet: 'trips', name: 'Weekend Trips', note: 'Best in October', word: 'the trips', count: WEEKEND_TRIPS.places.length, photo: '/media/trips.jpg', fallback: 'linear-gradient(150deg,#8fa8bd,#4a6377)' },
 ]
 
 // A count of zero is a real state, not a bug: apple picking ends in October
@@ -38,13 +42,20 @@ const SEASONAL = [
 // category with nothing upcoming falls back to a neutral label.
 const countCta = (n, word) => (n > 0 ? `See all ${n}` : `See ${word}`)
 
+// Pumpkin Patches, Fruit Picking and "What's on this month" are gone from this
+// grid on purpose. The first two are the opening tiles of the fall guide
+// directly above, so the page was selling them twice on one screen, and the
+// third went exactly where Events goes. Events leads instead.
+//
+// Halloween is in both, knowingly: the fall guide tile is the seasonal landing
+// and this one is the events list. It is the only remaining repeat on the page.
 const TILES = [
-  { pill: 'Pumpkin Patches', name: 'Pumpkin Patches', cta: (n) => countCta(n, 'the patches'), photo: '/media/pumpkin.jpg', fallback: 'linear-gradient(150deg,#dd9448 0%,#c2612f 100%)' },
-  { pill: 'Fruit Picking', name: 'Fruit Picking', cta: (n) => countCta(n, 'the farms'), photo: '/media/apple.jpg', fallback: 'linear-gradient(150deg,#8fb56a 0%,#4a7c3f 100%)' },
-  { pill: 'Beaches', name: 'Beaches & Tidepools', cta: () => 'See the coast', photo: '', fallback: 'linear-gradient(150deg,#7fb3d4 0%,#3d6f96 100%)' },
-  { pill: 'Playground', name: 'Playgrounds', cta: () => 'Find one near you', photo: '', fallback: 'linear-gradient(150deg,#b89ccc 0%,#6f4f8f 100%)' },
+  { pill: 'Events', name: 'Events', cta: () => "What's on this month", photo: '', fallback: 'linear-gradient(150deg,#2f8a63 0%,#12583a 100%)' },
+  { pill: 'Playground', name: 'Playgrounds', cta: (n) => (n > 0 ? `All ${n}, find one near you` : 'Find one near you'), photo: '', fallback: 'linear-gradient(150deg,#b89ccc 0%,#6f4f8f 100%)' },
+  { pill: 'Halloween', name: 'Halloween events', cta: (n) => countCta(n, 'what is on'), photo: '', fallback: 'linear-gradient(150deg,#8b7ab8 0%,#4b3d70 100%)' },
+  { pill: 'Boat Rides', name: 'Boat Rides', cta: () => 'Out on the water', photo: '', fallback: 'linear-gradient(150deg,#5c86ab 0%,#1f3a6b 100%)' },
   { pill: 'Museum', name: 'Museums', cta: () => 'Rainy day list', photo: '', fallback: 'linear-gradient(150deg,#e0a3ae 0%,#a8556a 100%)' },
-  { pill: 'Events', name: "What's on this month", cta: () => 'Browse everything', photo: '', fallback: 'linear-gradient(150deg,#9aa8b8 0%,#5c6b7d 100%)' },
+  { pill: 'Beaches', name: 'Beaches & Tidepools', cta: () => 'See the coast', photo: '', fallback: 'linear-gradient(150deg,#7fb3d4 0%,#3d6f96 100%)' },
 ]
 
 const bgFor = (t) => (t.photo ? `url('${t.photo}') center / cover` : t.fallback)
@@ -121,46 +132,85 @@ export default function Home({ countFor, onPick }) {
         <div style={{ fontSize: 10.5, color: '#a8a29a', marginTop: 13 }}>Free. No account. Nothing to install.</div>
       </div>
 
-      {/* Seasonal band. Three layers: photo, scrim, words. The scrim is what
-          keeps white type readable once a bright photo sits behind it.
+      {/* The fall guide. Heading and tiles now live inside ONE contained block
+          rather than a full-bleed band with a loose row of chips underneath,
+          which is what made the season read as two unrelated things.
+
+          Three layers as before: photo, scrim, words. The scrim is what keeps
+          white type readable once a bright photo sits behind it, and it is
+          heavier at the bottom than it used to be because the tiles sit there
+          now and they need a calm surface to sit on.
+
           The id is the target for ?section=fall. */}
-      <div id="section-fall" style={{ position: 'relative', overflow: 'hidden', scrollMarginTop: 12 }}>
+      <div
+        id="section-fall"
+        style={{
+          position: 'relative', overflow: 'hidden', scrollMarginTop: 12,
+          margin: '14px 16px 0', borderRadius: 18,
+          boxShadow: '0 10px 26px rgba(74,40,14,0.20)',
+        }}
+      >
         <div style={{ position: 'absolute', inset: 0, background: "url('/media/pumpkin.jpg') center / cover" }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(58,24,10,0.42) 0%, rgba(58,24,10,0.76) 100%)' }} />
-        <div style={{ position: 'relative', padding: '24px 18px 26px', color: '#fff' }}>
-          <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.88, marginBottom: 8 }}>Right now in the Bay Area</div>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 29, fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.6px', marginBottom: 11 }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(58,24,10,0.58) 0%, rgba(44,21,9,0.90) 48%, rgba(32,15,6,0.97) 100%)' }} />
+        <div style={{ position: 'relative', padding: '18px 14px 14px', color: '#fff' }}>
+          <div style={{ display: 'inline-block', fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#F6C99B', background: 'rgba(255,255,255,0.10)', border: '0.5px solid rgba(246,201,155,0.34)', padding: '4px 10px', borderRadius: 20, marginBottom: 10 }}>
+            Right now in the Bay Area
+          </div>
+          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.5px', marginBottom: 9 }}>
             Your complete guide to Bay&nbsp;Area fall
           </div>
-          <div style={{ fontSize: 12.5, lineHeight: 1.58, opacity: 0.95 }}>
-            From apple picking and pumpkin patches to the best fall colour streets and a weekend in the Sierra. All of it in one place, with the details you actually need.
+          <div style={{ fontSize: 12, lineHeight: 1.56, opacity: 0.92, marginBottom: 14 }}>
+            From apple picking and pumpkin patches to the best fall color streets and a weekend in the Sierra. All of it in one place, with the details you actually need.
+          </div>
+
+          {/* Seasonal tiles. Each goes straight into its category, or opens a
+              sheet for the two that have no category behind them.
+
+              2.2 across, not 2 and not 3. A whole number of tiles gives a thumb
+              no reason to believe there is anything to the right of them; the
+              part tile does that job without needing arrows or dots. The
+              negative margin lets them bleed to the container edge so the cut
+              one reads as continuing rather than as clipped. */}
+          <div
+            style={{
+              display: 'flex', gap: 9, overflowX: 'auto',
+              margin: '0 -14px', padding: '0 14px 2px',
+              scrollSnapType: 'x mandatory', scrollPaddingLeft: 14,
+            }}
+          >
+            {SEASONAL.map((s) => {
+              const n = s.count != null ? s.count : countFor(s.pill)
+              return (
+                <div
+                  key={s.name}
+                  onClick={() => (s.sheet ? openSheet(s.sheet) : onPick(s.pill))}
+                  style={{
+                    flex: '0 0 calc((100% - 18px) / 2.2)', scrollSnapAlign: 'start',
+                    position: 'relative', aspectRatio: '16 / 10', borderRadius: 13,
+                    overflow: 'hidden', cursor: 'pointer',
+                    boxShadow: '0 2px 5px rgba(20,10,4,0.30)',
+                  }}
+                >
+                  <div style={{ position: 'absolute', inset: 0, background: bgFor(s) }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(20,11,5,0.82) 100%)' }} />
+                  <div style={{ position: 'relative', height: '100%', padding: 9, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.18, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{s.name}</div>
+                    <div style={{ fontSize: 9.5, opacity: 0.86, marginTop: 1, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
+                      {n > 0 ? s.note : 'Back next season'}
+                    </div>
+                    <div style={{ background: '#fff', color: '#2D2D2D', fontSize: 9.5, fontWeight: 700, padding: '5px 0', borderRadius: 7, textAlign: 'center', marginTop: 6 }}>
+                      {countCta(n, s.word)}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
 
-      {/* Seasonal tiles. Each goes straight into its category, or opens a
-          sheet for the two that have no category behind them. */}
-      <div style={{ display: 'flex', gap: 9, overflowX: 'auto', padding: '13px 16px 2px' }}>
-        {SEASONAL.map((s) => {
-          const n = s.count != null ? s.count : countFor(s.pill)
-          return (
-            <div
-              key={s.name}
-              onClick={() => (s.sheet ? openSheet(s.sheet) : onPick(s.pill))}
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #E2DDD6', borderRadius: 12, padding: '9px 14px 9px 9px', cursor: 'pointer' }}
-            >
-              <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: bgFor(s) }} />
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{s.name}</div>
-                <div style={{ fontSize: 10, color: '#888880', whiteSpace: 'nowrap' }}>{n > 0 ? `${n} ${s.note}` : 'Back next season'}</div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
       {/* Weekend grid */}
-      <div id="section-weekend" style={{ padding: '24px 16px 0', scrollMarginTop: 12 }}>
+      <div id="section-weekend" style={{ padding: '26px 16px 0', scrollMarginTop: 12 }}>
         <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 700, textAlign: 'center', letterSpacing: '-0.3px', marginBottom: 3 }}>
           Where are we going this weekend?
         </div>
@@ -190,7 +240,7 @@ export default function Home({ countFor, onPick }) {
 
       <div id="section-about" style={{ margin: '24px 16px 0', padding: '17px 16px', background: '#fff', border: '0.5px solid #E2DDD6', borderRadius: 14, textAlign: 'center', scrollMarginTop: 12 }}>
         <div style={{ fontSize: 12, color: '#6b665f', lineHeight: 1.65 }}>
-          Built by a Bay Area mum who takes her two kids to all of it first.
+          Built by a Bay Area mom who takes her two kids to all of it first.
         </div>
         <a href="https://www.instagram.com/truly_athi/" target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 9, fontSize: 12, fontWeight: 700, color: '#1A6B4A', textDecoration: 'none' }}>
           Follow along on Instagram →

@@ -121,7 +121,47 @@ export function EventCardSkeleton() {
   )
 }
 
-export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false }) {
+// An all-day .ics the browser downloads. DTEND is exclusive in the spec, so a
+// one-day event needs tomorrow's date or every calendar app renders it as
+// zero-length and some hide it outright.
+function addToCalendar(event) {
+  if (!event.startDate) return
+  const compact = (d) => d.replace(/-/g, '')
+  const plusOne = (d) => {
+    const x = new Date(d + 'T12:00:00')
+    x.setDate(x.getDate() + 1)
+    return x.toISOString().slice(0, 10)
+  }
+  const esc = (s) => String(s || '').replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n')
+  const end = plusOne(event.endDate || event.startDate)
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Nexplore//EN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:nexplore-${event.id}@nexplore.us`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+    `DTSTART;VALUE=DATE:${compact(event.startDate)}`,
+    `DTEND;VALUE=DATE:${compact(end)}`,
+    `SUMMARY:${esc(event.title)}`,
+    `LOCATION:${esc(event.address || event.city || event.area || '')}`,
+    `DESCRIPTION:${esc(event.officialUrl && event.officialUrl !== '#' ? event.officialUrl : 'Found on nexplore.us')}`,
+    'END:VEVENT', 'END:VCALENDAR',
+  ]
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `${String(event.title || 'event').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48)}.ics`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+}
+
+// expanded / onToggleExpand are only passed on the Events tab. When
+// onToggleExpand is absent the card behaves exactly as it always has and
+// Learn more opens the official site, which is what every other pill still
+// wants: a playground has nothing to expand into.
+export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false, expanded = false, onToggleExpand = null }) {
+  const canExpand = !!onToggleExpand
   // Show city name if available, otherwise fall back to area
   const locationLabel = event.city || event.area || 'Bay Area'
 
@@ -164,7 +204,20 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
   // that scrapes a "$12" out of the description. Clearing price_label alone
   // would not be enough: any Boat Rides description mentioning a dollar figure
   // would quietly reappear as "From $12" on the card.
-  const displayPrice = hidePrice ? null : extractPrice()
+  const rawPrice = hidePrice ? null : extractPrice()
+
+  // PAID PRICES ARE NOT SHOWN ON CARDS, anywhere on the site. A bare number
+  // over a photo reads as an ad, and "From $12" was routinely wrong anyway:
+  // it came from a regex scraping the first dollar figure out of a sentence
+  // that might have been about parking. Only the free case survives, because
+  // free is the one price that is never ambiguous and is the thing a parent
+  // is actually scanning for. Paid stays a plain card with no badge.
+  const displayPrice = event.free ? rawPrice : null
+
+  // "FREE" for a genuinely free outing, "FREE ADMISSION" when the row says so,
+  // because a pumpkin patch that costs nothing to walk into but charges for
+  // every ride is not the same promise and parents notice the difference.
+  const freeLabel = /admission/i.test(rawPrice || '') ? 'FREE ADMISSION' : 'FREE'
   const dateRange = formatDateRange()
 
   // Seasonal state drives two badges, site-wide. Year-round rows (both season
@@ -181,6 +234,26 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
   // The info line under the title. Ages and reservations for every card; for
   // playgrounds also the few amenities that decide a trip, only when present.
   const tagNames = new Set((event.tags || []).map((t) => t.name))
+
+  // Everything the expansion reads is computed HERE, above the return, for the
+  // same reason EventSheet does it: a const referenced in JSX but declared
+  // after it is the white screen this codebase has hit before, and vite build
+  // compiles it without a word.
+  const expandBody = (event.description || '')
+    .split('\n')
+    .filter((line) => !/^\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{267F}]/u.test(line.trim()))
+    .join('\n')
+    .trim()
+  const amenityTags = (event.tags || []).filter((t) => t.tag_group === 'amenity')
+  const detailRows = [
+    dateRange && { k: 'When', v: dateRange + (event.timeLabel ? ` · ${event.timeLabel}` : '') },
+    { k: 'Where', v: locationLabel },
+    // The one place a paid price is still spelled out. Off the card face, on
+    // purpose; here, because this is the moment someone is deciding.
+    (event.price || event.free) && { k: 'Cost', v: event.free ? (event.price || 'Free') : event.price },
+    event.ages && { k: 'Ages', v: event.ages },
+  ].filter(Boolean)
+
   const chips = []
   if (showAges) chips.push({ key: 'ages', label: `Ages ${event.ages}`, bg: '#E8F5EE', fg: '#1A6B4A' })
   if (event.needsReservation) chips.push({ key: 'res', label: '🎟 Reservation required', bg: '#FEF0E6', fg: '#C94F2C' })
@@ -202,14 +275,15 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
     >
       {/* Image — clicking image opens official URL */}
       <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => onSelect(event)}>
-        <EventImage event={event} height={150} />
+        {/* Shorter, not taller, when open. The card is twice as wide here, so
+            keeping 150 would have made a 440px banner that pushes the thing
+            someone actually tapped for below the fold. */}
+        <EventImage event={event} height={expanded ? 132 : 150} />
         {/* hidePrice takes the FREE badge with it. On a pill where cost is
             deliberately not shown, a FREE badge on one card and silence on the
             rest reads as an inconsistency rather than as information. */}
         {!hidePrice && event.free ? (
-          <div style={{ position: 'absolute', top: 7, left: 7, background: theme.freeBadgeBg, color: theme.freeBadgeFg, fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5, boxShadow: theme.freeBadgeBg === 'white' ? '0 1px 4px rgba(0,0,0,0.2)' : 'none' }}>FREE</div>
-        ) : displayPrice ? (
-          <div style={{ position: 'absolute', top: 7, left: 7, background: '#2D2D2D', color: 'white', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 5 }}>{displayPrice}</div>
+          <div style={{ position: 'absolute', top: 7, left: 7, background: theme.freeBadgeBg, color: theme.freeBadgeFg, fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5, boxShadow: theme.freeBadgeBg === 'white' ? '0 1px 4px rgba(0,0,0,0.2)' : 'none' }}>{freeLabel}</div>
         ) : null}
         {/* Seasonal badge. Sits bottom-left rather than top-left so it never
             fights the price or Pick badges, and is legible over any photo
@@ -230,7 +304,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
         {/* Pick moved to the left column. The top-right corner now belongs to
             Share, and the two used to sit on top of each other. */}
         {isEditorPick && (
-          <div style={{ position: 'absolute', top: (event.free || displayPrice) ? 25 : 7, left: 7, background: '#C94F2C', color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5 }}>✦ Top pick</div>
+          <div style={{ position: 'absolute', top: event.free ? 25 : 7, left: 7, background: '#C94F2C', color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5 }}>✦ Top pick</div>
         )}
         {/* 34px circle sitting inside a 44px tap area. 44 is the accepted floor
             for a touch target and the old 26px one was genuinely hard to hit.
@@ -291,12 +365,65 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
                 📍 Directions
               </div>
               <div
-                onClick={(e) => { e.stopPropagation(); onSelect(event) }}
+                onClick={(e) => { e.stopPropagation(); canExpand ? onToggleExpand(event) : onSelect(event) }}
                 style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.learnFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
-                Learn more →
+                {canExpand ? (expanded ? 'Close ▲' : 'Learn more ▾') : 'Learn more →'}
               </div>
             </div>
+
+            {/* The expansion.
+                Two columns because the card is full width when this shows, and
+                one long measure of 11px text across 440px is a wall. The right
+                column holds the things a parent decides on, price included:
+                this is where a paid price lives now that it is off the card
+                face. */}
+            {canExpand && expanded && (
+              <div style={{ marginTop: 11, paddingTop: 11, borderTop: '0.5px solid #EDE7DF', display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 13, alignItems: 'start' }}>
+                <div>
+                  {expandBody ? (
+                    <div style={{ fontSize: 11, color: '#5C5C56', lineHeight: 1.62, whiteSpace: 'pre-line' }}>{expandBody}</div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: '#a8a29a', fontStyle: 'italic' }}>No description yet.</div>
+                  )}
+                  {amenityTags.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 9 }}>
+                      {amenityTags.slice(0, 8).map((t) => (
+                        <div key={t.name} style={{ background: theme.accentSoft, color: theme.accent, fontSize: 8.5, fontWeight: 600, padding: '3px 8px', borderRadius: 10 }}>
+                          {t.name.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  {detailRows.map((r) => (
+                    <div key={r.k} style={{ marginBottom: 7 }}>
+                      <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#a8a29a' }}>{r.k}</div>
+                      <div style={{ fontSize: 10.5, color: '#2D2D2D', lineHeight: 1.4, marginTop: 1 }}>{r.v}</div>
+                    </div>
+                  ))}
+
+                  {event.startDate && (
+                    <div
+                      onClick={(e) => { e.stopPropagation(); addToCalendar(event) }}
+                      style={{ marginTop: 9, padding: '7px 0', borderRadius: 8, background: '#1A6B4A', color: 'white', textAlign: 'center', fontSize: 9.5, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Add to calendar
+                    </div>
+                  )}
+                  {event.officialUrl && event.officialUrl !== '#' && (
+                    <div
+                      onClick={(e) => { e.stopPropagation(); onSelect(event) }}
+                      style={{ marginTop: 6, padding: '7px 0', borderRadius: 8, border: '0.5px solid #1A6B4A', background: 'white', textAlign: 'center', fontSize: 9.5, fontWeight: 700, color: '#1A6B4A', cursor: 'pointer' }}
+                    >
+                      Official site →
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
       </div>
     </div>
   )
