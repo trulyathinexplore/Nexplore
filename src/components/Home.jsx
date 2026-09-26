@@ -173,7 +173,7 @@ export default function Home({ countFor, onPick }) {
               one reads as continuing rather than as clipped. */}
           <div
             style={{
-              display: 'flex', gap: 9, overflowX: 'auto',
+              display: 'flex', gap: 11, overflowX: 'auto',
               margin: '0 -14px', padding: '0 14px 2px',
               scrollSnapType: 'x mandatory', scrollPaddingLeft: 14,
             }}
@@ -186,19 +186,19 @@ export default function Home({ countFor, onPick }) {
                   onClick={() => (s.sheet ? openSheet(s.sheet) : onPick(s.pill))}
                   style={{
                     flex: '0 0 calc((100% - 18px) / 2.2)', scrollSnapAlign: 'start',
-                    position: 'relative', aspectRatio: '16 / 10', borderRadius: 13,
+                    position: 'relative', aspectRatio: '16 / 10', borderRadius: 14,
                     overflow: 'hidden', cursor: 'pointer',
                     boxShadow: '0 2px 5px rgba(20,10,4,0.30)',
                   }}
                 >
                   <div style={{ position: 'absolute', inset: 0, background: bgFor(s) }} />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(20,11,5,0.82) 100%)' }} />
-                  <div style={{ position: 'relative', height: '100%', padding: 9, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  <div style={{ position: 'relative', height: '100%', padding: 11, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
                     <div style={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.18, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{s.name}</div>
                     <div style={{ fontSize: 9.5, opacity: 0.86, marginTop: 1, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
                       {n > 0 ? s.note : 'Back next season'}
                     </div>
-                    <div style={{ background: '#fff', color: '#2D2D2D', fontSize: 9.5, fontWeight: 700, padding: '5px 0', borderRadius: 7, textAlign: 'center', marginTop: 6 }}>
+                    <div style={{ background: '#fff', color: '#2D2D2D', fontSize: 9.5, fontWeight: 700, padding: '6px 0', borderRadius: 8, textAlign: 'center', marginTop: 8 }}>
                       {countCta(n, s.word)}
                     </div>
                   </div>
@@ -210,7 +210,7 @@ export default function Home({ countFor, onPick }) {
       </div>
 
       {/* Weekend grid */}
-      <div id="section-weekend" style={{ padding: '26px 16px 0', scrollMarginTop: 12 }}>
+      <div id="section-weekend" style={{ padding: '30px 16px 0', scrollMarginTop: 12 }}>
         <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 700, textAlign: 'center', letterSpacing: '-0.3px', marginBottom: 3 }}>
           Where are we going this weekend?
         </div>
@@ -218,18 +218,18 @@ export default function Home({ countFor, onPick }) {
           Pick a thing. We have already done the looking.
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           {TILES.map((t) => (
             <div
               key={t.name}
               onClick={() => onPick(t.pill)}
-              style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', height: 134, cursor: 'pointer' }}
+              style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', height: 142, cursor: 'pointer', boxShadow: '0 1px 2px rgba(32,26,18,0.06), 0 5px 14px rgba(32,26,18,0.10)' }}
             >
               <div style={{ position: 'absolute', inset: 0, background: bgFor(t) }} />
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 32%, rgba(26,15,8,0.74) 100%)' }} />
-              <div style={{ position: 'relative', height: '100%', padding: 11, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+              <div style={{ position: 'relative', height: '100%', padding: 13, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
                 <div style={{ color: '#fff', fontSize: 13.5, fontWeight: 700, lineHeight: 1.2, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>{t.name}</div>
-                <div style={{ background: '#fff', color: '#2D2D2D', fontSize: 10, fontWeight: 700, padding: '6px 0', borderRadius: 7, textAlign: 'center', marginTop: 7 }}>
+                <div style={{ background: '#fff', color: '#2D2D2D', fontSize: 10, fontWeight: 700, padding: '7px 0', borderRadius: 8, textAlign: 'center', marginTop: 9 }}>
                   {t.cta(countFor(t.pill))}
                 </div>
               </div>

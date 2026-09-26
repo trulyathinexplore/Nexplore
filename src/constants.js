@@ -10,7 +10,11 @@
 export const PILLS = [
   { label: 'Playground',    type: 'category',  value: 'Playground',
     fixedAmenities: ['free', 'restrooms', 'parking-onsite', 'splash-pad', 'toddler-area', 'inclusive-playground', 'reservable-picnic', 'bbq-grills', 'dog-friendly'] },
-  { label: 'Events',        type: 'eventType', value: 'event' },
+  // expandable: Learn more opens the card in place instead of linking out.
+  // Only for pills whose rows are event-shaped, meaning they have a date, a
+  // ticket and a description worth reading before deciding. A playground has
+  // none of those, so it keeps the link out.
+  { label: 'Events',        type: 'eventType', value: 'event', expandable: true },
   // hidden: the pill stays in this list so every link ever shared with
   // ?view=Water%20Play still resolves and still filters correctly. It is only
   // dropped from the pill ROW in App.jsx. Water play season is over; delete
@@ -26,16 +30,39 @@ export const PILLS = [
     // so 'free' overpromises here. 'free' stays the special case in App.jsx that
     // reads the is_free column; 'free-admission' is an ordinary tag, so it needs
     // no code change. Every other pill keeps 'free' and is untouched.
+    expandable: true,
     fixedAmenities: ['dog-friendly', 'wheelchair-accessible', 'free-admission', 'rides-games']
   },
   {
     label: 'Halloween',
     type: 'seasonalType',
-    value: 'halloween'
+    value: 'halloween',
+    expandable: true,
+    // A chosen set, replacing the scraped one that produced "Light
+    // installations" and "Night event". The order is deliberate: the first two
+    // are the questions a parent asks before any other, will it frighten my
+    // kid and does it cost anything.
+    //
+    // `home-display` is the SAME tag the Holiday pill uses, on purpose. A
+    // decorated private house is a decorated private house whether the lights
+    // are orange or green, and several of these addresses are literally the
+    // same house in both seasons: 697 Sonoma Ave in Livermore is Christmas on
+    // Sonoma in December and Frightmare in October. One tag means tagging a
+    // house once, and it means the label map only has to carry one word for it.
+    fixedAmenities: ['no-spooks', 'free', 'family-friendly', 'haunted-maze', 'home-display'],
   },
   { label: 'Fruit Picking',  type: 'category', value: 17,
     fixedAmenities: ['apple-picking'] },
-  { label: 'Holiday Events', type: 'category', value: 16 },
+  { label: 'Holiday Events', type: 'category', value: 16, expandable: true,
+    // Trains is `train-ride` and Ice rink is `ice-skating`; drive-through and
+    // santa-photos already exist from the holiday import. Only
+    // christmas-village was new.
+    //
+    // Seven is on the long side for a row that scrolls sideways on a phone.
+    // The first three fit without scrolling, so Free, Home display and Drive
+    // through lead deliberately: they are the ones that narrow the list most.
+    fixedAmenities: ['free', 'home-display', 'drive-through', 'train-ride',
+                     'ice-skating', 'christmas-village', 'santa-photos'] },
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair', hidden: true },
   { label: 'Zoo & Aquarium', type: 'category', value: ['Zoo', 'Aquarium']},
   { label: 'Museum',        type: 'category',  value: 'Museum' },
@@ -120,13 +147,38 @@ export const hidesPriceForEvent = (ev) =>
  
 export const REGIONS = ['San Francisco', 'East Bay', 'South Bay', 'Peninsula', 'North Bay', 'Tri-Valley']
  
+// A city missing from this map is not merely unsorted: it is INVISIBLE to
+// region filtering, silently. Twenty-six cities had venues and no region,
+// including Tracy with 69 and Brentwood with 34, so a parent in Tracy filtering
+// to their own area got nothing and had no way to tell why.
+//
+// Anything added here must also exist in the region chips, or it sorts into a
+// region nobody can select.
+//
+// Judgment calls worth knowing about, since none of these have one right answer:
+//   Tracy and Mountain House are San Joaquin County, not the Bay Area at all.
+//   They are in Tri-Valley because that is the region a Tracy family drives
+//   into, and 75 venues is too many to leave unreachable.
+//   Capitola sits with Santa Cruz and Aptos in South Bay, which is
+//   geographically generous but matches how people search.
+//   Vallejo is North Bay; it is Solano County and reads that way to locals.
+//   Brentwood, Antioch, Byron and Clayton are far East Bay, kept in East Bay
+//   rather than given a region of their own until the counts justify one.
 export const REGION_CITIES = {
   'San Francisco': ['San Francisco'],
-  'East Bay':      ['Oakland', 'Berkeley', 'Hayward', 'San Leandro', 'Fremont', 'Alameda', 'Richmond'],
-  'South Bay':     ['San Jose', 'Santa Clara', 'Sunnyvale', 'Mountain View', 'Palo Alto', 'Cupertino', 'Milpitas', 'Aptos', 'Santa Cruz'],
-  'Peninsula':     ['San Mateo', 'Redwood City', 'Burlingame', 'South San Francisco', 'Daly City', 'Millbrae', 'Half Moon Bay', 'Moss Beach', 'San Gregorio', 'Pescadero'],
-  'North Bay':     ['Mill Valley', 'San Rafael', 'Novato', 'Sausalito', 'Tiburon', 'Pacific Grove'],
-  'Tri-Valley':    ['Dublin', 'Pleasanton', 'Livermore', 'San Ramon', 'Danville', 'Walnut Creek'],
+  'East Bay':      ['Oakland', 'Berkeley', 'Hayward', 'San Leandro', 'Fremont', 'Alameda', 'Richmond',
+                    'Union City', 'Newark', 'Castro Valley', 'San Lorenzo', 'San Pablo', 'Concord',
+                    'Pleasant Hill', 'Moraga', 'Brentwood', 'Antioch', 'Byron', 'Clayton'],
+  'South Bay':     ['San Jose', 'Santa Clara', 'Sunnyvale', 'Mountain View', 'Palo Alto', 'Cupertino',
+                    'Milpitas', 'Aptos', 'Santa Cruz', 'Los Gatos', 'Saratoga', 'Campbell',
+                    'Los Altos', 'Morgan Hill', 'Gilroy', 'Capitola'],
+  'Peninsula':     ['San Mateo', 'Redwood City', 'Burlingame', 'South San Francisco', 'Daly City',
+                    'Millbrae', 'Half Moon Bay', 'Moss Beach', 'San Gregorio', 'Pescadero',
+                    'San Carlos', 'Woodside'],
+  'North Bay':     ['Mill Valley', 'San Rafael', 'Novato', 'Sausalito', 'Tiburon', 'Pacific Grove',
+                    'Vallejo'],
+  'Tri-Valley':    ['Dublin', 'Pleasanton', 'Livermore', 'San Ramon', 'Danville', 'Walnut Creek',
+                    'Sunol', 'Tracy', 'Mountain House'],
 }
  
 // All cities across all regions (for location search matching)
@@ -207,7 +259,19 @@ export const AMENITY_LABELS = {
   'dog-friendly': '🐕 Dog friendly',
   'picnic-area': '🧺 Picnic area',
   'wheelchair-accessible': '♿ Accessible',
-  'rides-games': '🎡 Rides & Games'
+  'rides-games': '🎡 Rides & Games',
+  // Halloween and Holiday sub-pills. The label is what people read; the key is
+  // the tag in the database, and several keys deliberately predate the label so
+  // existing tagging keeps working.
+  'no-spooks': '🧸 No spooks',
+  'family-friendly': '👪 Family friendly',
+  'haunted-maze': '🕸 Haunted maze',
+  'home-display': '🏠 Home display',
+  'drive-through': '🚙 Drive through',
+  'santa-photos': '🎅 Santa photos',
+  'train-ride': '🚂 Trains',
+  'ice-skating': '⛸ Ice rink',
+  'christmas-village': '🎄 Christmas village'
 }
  
 // Extract amenities from description field (for pumpkin patches with emoji badges)

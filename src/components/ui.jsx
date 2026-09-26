@@ -160,8 +160,23 @@ function addToCalendar(event) {
 // onToggleExpand is absent the card behaves exactly as it always has and
 // Learn more opens the official site, which is what every other pill still
 // wants: a playground has nothing to expand into.
-export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false, expanded = false, onToggleExpand = null }) {
+export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false, expanded = false, onToggleExpand = null, wide = false }) {
   const canExpand = !!onToggleExpand
+
+  // Is there anywhere worth sending someone? A missing url, a placeholder '#',
+  // or a Google Maps link all mean no. The maps case is the interesting one:
+  // those were put in official_url as a fallback when a venue had no website,
+  // but the card already has a Directions button, so a Learn more that opens
+  // the same map is the same button twice wearing different words.
+  const officialUrl = event.officialUrl || ''
+  const isMapLink = /(^|\.)google\.[a-z.]+\/maps|maps\.google\.|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(officialUrl)
+  const hasLink = !!officialUrl && officialUrl !== '#' && !isMapLink
+
+  // Learn more earns its place if it EXPANDS (it does something on this pill)
+  // or if it LINKS somewhere real. When neither is true, Directions is the only
+  // action left, so it stops being half a row and takes the whole one.
+  const showLearnMore = canExpand || hasLink
+  const directionsOnly = !showLearnMore
   // Show city name if available, otherwise fall back to area
   const locationLabel = event.city || event.area || 'Bay Area'
 
@@ -266,19 +281,29 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
   return (
     <div
       style={{
-        borderRadius: 14, overflow: 'hidden', background: 'white', border: theme.cardBorder,
-        boxShadow: '0 2px 8px rgba(26,107,74,0.08)', animation: 'fadeIn 0.3s ease',
+        borderRadius: 16, overflow: 'hidden', background: 'white', border: theme.cardBorder,
+        // Two shadows rather than one. The tight 2px pass is what reads as an
+        // edge and keeps the card from floating; the wide soft pass is the
+        // lift. A single 8px blur has to do both jobs and does neither well.
+        boxShadow: '0 1px 2px rgba(32,26,18,0.05), 0 5px 14px rgba(32,26,18,0.07)',
+        animation: 'fadeIn 0.3s ease',
         transition: 'transform 0.15s, box-shadow 0.15s',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(26,107,74,0.15)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(26,107,74,0.08)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(32,26,18,0.06), 0 10px 22px rgba(32,26,18,0.12)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(32,26,18,0.05), 0 5px 14px rgba(32,26,18,0.07)' }}
     >
       {/* Image — clicking image opens official URL */}
-      <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => onSelect(event)}>
-        {/* Shorter, not taller, when open. The card is twice as wide here, so
-            keeping 150 would have made a 440px banner that pushes the thing
-            someone actually tapped for below the fold. */}
-        <EventImage event={event} height={expanded ? 132 : 150} />
+      {/* With no link and nothing to expand, tapping the photo used to do
+          nothing at all. It goes to directions instead. */}
+      <div
+        style={{ position: 'relative', cursor: 'pointer' }}
+        onClick={() => (directionsOnly ? onDirections && onDirections(event) : onSelect(event))}
+      >
+        {/* Shorter, not taller, whenever the card is full width, whether that
+            is because it is expanded or because it is a featured pick. Keeping
+            150 across 440px makes a banner that pushes the thing someone
+            actually tapped for below the fold. */}
+        <EventImage event={event} height={(expanded || wide) ? 132 : 150} />
         {/* hidePrice takes the FREE badge with it. On a pill where cost is
             deliberately not shown, a FREE badge on one card and silence on the
             rest reads as an inconsistency rather than as information. */}
@@ -330,23 +355,23 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
         )}
       </div>
 
-      <div style={{ padding: '8px 10px 10px' }}>
+      <div style={{ padding: '11px 12px 13px' }}>
             {dateRange && (
-              <div style={{ fontSize: 9, fontWeight: 700, color: theme.dateFg, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>{dateRange}</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: theme.dateFg, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 5 }}>{dateRange}</div>
             )}
             <div
               onClick={() => onSelect(event)}
-              style={{ fontSize: 12, fontWeight: 600, color: '#2D2D2D', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: 3, cursor: 'pointer' }}
+              style={{ fontSize: 12, fontWeight: 600, color: '#2D2D2D', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: 5, cursor: 'pointer' }}
             >
               {event.title}
             </div>
 
-            <div style={{ fontSize: 10, color: '#888880', marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: '#888880', lineHeight: 1.45, marginBottom: 9 }}>
               {locationLabel}{displayPrice ? ` · ${displayPrice}` : ''}
             </div>
 
             {chips.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
                 {chips.map((c) => (
                   <div key={c.key} style={{ background: c.bg, color: c.fg, fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10 }}>{c.label}</div>
                 ))}
@@ -357,19 +382,32 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
                 especially worth having here now that pumpkin patches carry real
                 street addresses — before, openDirections could only send Google
                 Maps a city name. */}
-            <div style={{ display: 'flex', gap: 5 }}>
+            <div style={{ display: 'flex', gap: 7 }}>
               <div
                 onClick={(e) => { e.stopPropagation(); onDirections && onDirections(event) }}
-                style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.dirBorder, background: theme.dirBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.dirFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{
+                  flex: 1,
+                  padding: directionsOnly ? '11px 0' : '8px 0',
+                  borderRadius: 9,
+                  border: directionsOnly ? 'none' : theme.dirBorder,
+                  background: directionsOnly ? '#1A6B4A' : theme.dirBg,
+                  textAlign: 'center',
+                  fontSize: directionsOnly ? 11 : 9.5,
+                  fontWeight: directionsOnly ? 700 : 600,
+                  color: directionsOnly ? 'white' : theme.dirFg,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
               >
                 📍 Directions
               </div>
-              <div
-                onClick={(e) => { e.stopPropagation(); canExpand ? onToggleExpand(event) : onSelect(event) }}
-                style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 9, fontWeight: 600, color: theme.learnFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
-                {canExpand ? (expanded ? 'Close ▲' : 'Learn more ▾') : 'Learn more →'}
-              </div>
+              {showLearnMore && (
+                <div
+                  onClick={(e) => { e.stopPropagation(); canExpand ? onToggleExpand(event) : onSelect(event) }}
+                  style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 9.5, fontWeight: 600, color: theme.learnFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {canExpand ? (expanded ? 'Close ▲' : 'Learn more ▾') : 'Learn more →'}
+                </div>
+              )}
             </div>
 
             {/* The expansion.
@@ -379,7 +417,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
                 this is where a paid price lives now that it is off the card
                 face. */}
             {canExpand && expanded && (
-              <div style={{ marginTop: 11, paddingTop: 11, borderTop: '0.5px solid #EDE7DF', display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 13, alignItems: 'start' }}>
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '0.5px solid #EDE7DF', display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 16, alignItems: 'start' }}>
                 <div>
                   {expandBody ? (
                     <div style={{ fontSize: 11, color: '#5C5C56', lineHeight: 1.62, whiteSpace: 'pre-line' }}>{expandBody}</div>
@@ -413,7 +451,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
                       Add to calendar
                     </div>
                   )}
-                  {event.officialUrl && event.officialUrl !== '#' && (
+                  {hasLink && (
                     <div
                       onClick={(e) => { e.stopPropagation(); onSelect(event) }}
                       style={{ marginTop: 6, padding: '7px 0', borderRadius: 8, border: '0.5px solid #1A6B4A', background: 'white', textAlign: 'center', fontSize: 9.5, fontWeight: 700, color: '#1A6B4A', cursor: 'pointer' }}

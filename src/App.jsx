@@ -252,7 +252,12 @@ export default function App() {
     const el = document.getElementById(`section-${section}`)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [isHome, loading])
-  const showAmenities = activePill?.type === 'category' || activePill?.type === 'tagGroup' || activePill?.type === 'seasonalType'
+  // noAmenities opts a pill out of the sub-filter row entirely. Without it a
+  // pill with no fixedAmenities list gets whatever tags happen to exist on its
+  // rows, which is how Halloween ended up offering "Light installations" and
+  // "Night event": nobody chose those, they were a side effect of tagging.
+  const showAmenities = !activePill?.noAmenities
+    && (activePill?.type === 'category' || activePill?.type === 'tagGroup' || activePill?.type === 'seasonalType')
   // Only show date/time chips when Events pill is active
   const showDateChips = activePill?.type === 'eventType'
 
@@ -472,9 +477,63 @@ const filtered = base.filter((ev) => {
  const filterCount = [weekend, freeOnly, !!region, !!selectedMonthFilter].filter(Boolean).length + amenities.length
 
   // Click-through handlers with tracking
-  // Events tab only for this release. Every other pill keeps Learn more as a
-  // link out, which is right for a playground: there is nothing to expand into.
-  const canExpand = pill === 'Events'
+  // Driven by the pill's own `expandable` flag rather than a list of names
+  // here. Events, Halloween, Holiday Events and Pumpkin Patches carry it;
+  // everything else keeps Learn more as a link out, which is right for a
+  // playground, since there is nothing to expand into.
+  const canExpand = !!activePill?.expandable
+
+  // ---------------------------------------------------------------------
+  // Grid packing.
+  //
+  // Two kinds of card take the full width: a featured pick, and an expanded
+  // card. CSS grid on its own handles that badly. A full-width item that meets
+  // a half-filled row cannot fit, so it drops to the next row and leaves a hole
+  // behind it. grid-auto-flow: dense would backfill that hole, but then the
+  // browser owns the order and the code no longer knows which column any card
+  // is in, which is exactly the thing the expansion needs to know.
+  //
+  // So the packing is done here instead, in one pass, and the DOM order is the
+  // visual order. Nothing relies on CSS `order` any more.
+  //
+  //   - a featured card takes a whole row
+  //   - when a featured card would leave the right half of a row empty, the
+  //     next ordinary card is pulled up to fill it, the same thing dense would
+  //     do, except we know about it
+  //   - every entry knows its column, which is what makes the rule below work
+  //
+  // Then the expansion rule: if the card being opened sits in the RIGHT column,
+  // it swaps with its left neighbour so it keeps the row it was already in.
+  // Without that it would drop a row to find the width, and the card under
+  // someone's thumb would run away from them.
+  // ---------------------------------------------------------------------
+  const packCards = (list) => {
+    const queue = list.slice()
+    const out = []
+    let col = 0
+
+    while (queue.length) {
+      if (col === 1) {
+        const i = queue.findIndex((e) => !e.isEditorPick)
+        if (i === -1) { col = 0; continue }        // only wide ones left, let the row end
+        out.push({ ev: queue.splice(i, 1)[0], col: 1, wide: false })
+        col = 0
+        continue
+      }
+      const ev = queue.shift()
+      if (ev.isEditorPick) { out.push({ ev, col: 0, wide: true }); col = 0 }
+      else { out.push({ ev, col: 0, wide: false }); col = 1 }
+    }
+
+    if (canExpand && expandedId != null) {
+      const i = out.findIndex((s) => s.ev.id === expandedId)
+      if (i > 0 && out[i].col === 1) {
+        const [me] = out.splice(i, 1)
+        out.splice(i - 1, 0, me)
+      }
+    }
+    return out
+  }
 
   const toggleExpand = (ev) => {
     setExpandedId((cur) => {
@@ -829,20 +888,16 @@ const filtered = base.filter((ev) => {
           i * 2 - 3, which slots it BEFORE its left-hand neighbour: the open
           card keeps the row it was already in, and the neighbour is the thing
           that moves. Closing restores i * 2. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, padding: '0 16px 24px' }}>
         {loading
           ? [1, 2, 3, 4].map((i) => <EventCardSkeleton key={i} />)
-          : upcoming.map((ev, i) => {
+          : packCards(upcoming).map(({ ev, wide }) => {
               const isOpen = canExpand && expandedId === ev.id
-              const claimsRow = isOpen && i % 2 === 1
+              const full = wide || isOpen
               return (
                 <div
                   key={ev.id}
-                  style={{
-                    minWidth: 0,
-                    order: canExpand ? (claimsRow ? i * 2 - 3 : i * 2) : undefined,
-                    gridColumn: isOpen ? '1 / -1' : undefined,
-                  }}
+                  style={{ minWidth: 0, gridColumn: full ? '1 / -1' : undefined }}
                 >
                   <EventCard
                     event={ev}
@@ -854,6 +909,7 @@ const filtered = base.filter((ev) => {
                     hidePrice={hidePrice || hidesPriceForEvent(ev)}
                     expanded={isOpen}
                     onToggleExpand={canExpand ? toggleExpand : null}
+                    wide={full}
                   />
                 </div>
               )
