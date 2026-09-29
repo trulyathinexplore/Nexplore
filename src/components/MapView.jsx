@@ -95,7 +95,10 @@ function loadLeaflet() {
 // theme do: this is the SAME EventCard the list renders, so anything the list
 // suppresses the map must suppress too. Forgetting to pass a prop here is
 // exactly how the map pin card once shipped without its share button.
-export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, pin = pinStyleFor(null), hidePrice = false }) {
+// contained: render inside the page (the redesign's map box) instead of as a
+// full-screen layer. The page head already carries the Map/List and Share
+// buttons, so the top bar is dropped in that mode.
+export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, pin = pinStyleFor(null), hidePrice = false, contained = false }) {
   const holder = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -183,9 +186,11 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
   }, [selected, status, pin])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 900, background: '#E8E4DC', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+    <div style={contained
+      ? { position: 'absolute', inset: 0, background: '#E8E4DC', display: 'flex', flexDirection: 'column' }
+      : { position: 'fixed', inset: 0, zIndex: 900, background: '#E8E4DC', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
       {/* Bar */}
-      <div style={{ background: 'white', padding: '9px 14px', borderBottom: '0.5px solid #E2DDD6', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+      {!contained && <div style={{ background: 'white', padding: '9px 14px', borderBottom: '0.5px solid #E2DDD6', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <button
           onClick={onClose}
           aria-label="Back to list"
@@ -222,7 +227,7 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
             <ShareGlyph size={13} color={theme ? theme.accent : '#1A6B4A'} />
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Canvas */}
       <div style={{ flex: 1, position: 'relative' }}>

@@ -11,6 +11,15 @@ const headers = {
   'Content-Type': 'application/json',
 }
  
+// PREVIEW ONLY: until real reels are uploaded, the preview site shows a
+// sample clip on editor picks and a few listings so the Watch flow can be
+// tried. Never runs on nexplore.us.
+const DEMO_VIDEO = typeof window !== 'undefined' && /preview|localhost|^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname)
+function demoVideo(e) {
+  if (!DEMO_VIDEO) return null
+  return /spina/i.test(e.title || '') || e.featured || e.is_editor_pick || Number(e.id) % 3 === 0 ? '/media/sample-reel.mp4' : null
+}
+
 // Embed category name + tags + venue (for city/address) so pills/amenities can filter on them.
 export async function fetchEvents({ freeOnly = false } = {}) {
 const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,address,city,state,latitude,longitude)'
@@ -91,6 +100,7 @@ export function mapEvent(e) {
     title: e.title,
     description: e.description || '',
     imageUrl: e.image_url || null,
+    videoUrl: e.video_url || demoVideo(e),
     officialUrl: e.official_url || e.website_url || e.registration_url || '#',
     free: e.is_free || e.price_type === 'free' || false,
     price: e.price_label || (e.price_amount ? `$${e.price_amount}` : null),

@@ -11,8 +11,9 @@ import {
 import { readFilters, writeFilters } from './urlState.js'
 import {
   SearchIcon, FilterIcon, EventCard, EventCardSkeleton,  FilterDrawer,
-  ShareSheet, EventSheet, ShareGlyph,
+  ShareSheet, EventSheet, ShareGlyph, addToCalendar,
 } from './components/ui.jsx'
+import { CategoryRow, FeatureCard, CompactRow, PageHead, featureLabel } from './components/Redesign.jsx'
 import {
   eventUrl, viewUrl, eventShareText, viewShareText,
   targets, copyLink, canNativeShare, nativeShare,
@@ -79,6 +80,20 @@ function isThisWeekend(dateStr) {
   return d >= sat && d <= sun
 }
 
+// The weekend after this one. Same shape as isThisWeekend, one week on.
+function isNextWeekend(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00')
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  const day = now.getDay()
+  const sat = new Date(now)
+  if (day === 0) sat.setDate(now.getDate() - 1)
+  else sat.setDate(now.getDate() + ((6 - day + 7) % 7))
+  sat.setDate(sat.getDate() + 7)
+  sat.setHours(0, 0, 0, 0)
+  const sun = new Date(sat); sun.setDate(sat.getDate() + 1); sun.setHours(23, 59, 59, 999)
+  return d >= sat && d <= sun
+}
+
 // Check if an event falls in a specific month, keyed as "YYYY-M" so that
 // the Jan chip shown in November means Jan of NEXT year, not this one.
 function monthKey(year, month) {
@@ -120,10 +135,25 @@ export default function App() {
   const [copied, setCopied] = useState(false)
   // The id from ?event= on a shared link, held until the sheet is closed.
   const [openEventId, setOpenEventId] = useState(init.event)
+  const [sheetAutoPlay, setSheetAutoPlay] = useState(false)
+  // The pinned filter/title block sits right under the sticky header; keep its
+  // offset equal to the header's real height.
+  useEffect(() => {
+    const el = document.querySelector('.nx-top')
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const set = () => document.documentElement.style.setProperty('--nx-top-h', `${el.offsetHeight}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   // Held in state rather than re-read from the URL each render, because
   // writeFilters rewrites the address bar and anything not carried there is
   // gone by the second render.
   const [section] = useState(init.section)
+  // Redesign: Near [city] picker and the Next weekend chip.
+  const [city, setCity] = useState(init.city)
+  const [nextWeekend, setNextWeekend] = useState(false)
 
   // Calculate current and next 2 months dynamically
   const getCurrentAndNextMonths = () => {
@@ -159,10 +189,10 @@ export default function App() {
   }, [freeOnly])
 
   useEffect(() => {
-    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap, section })
+    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap, section, city })
     // A card left open on one filter has no business being open on the next.
     setExpandedId(null)
-  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap, section])
+  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap, section, city, nextWeekend])
 
   // A real page_view per category. Without this GA sees one page_view for the
   // whole visit and every standard report collapses the site into a single
@@ -200,12 +230,8 @@ export default function App() {
   }, [pill])
 
   // Body must not scroll behind the full-screen map on iOS.
-  useEffect(() => {
-    if (!showMap) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [showMap])
+  // (The map used to be full screen and locked body scroll here. In the
+  // redesign it sits inside the page, so the page keeps scrolling.)
 
   // Track page engagement (time spent on page)
   useEffect(() => {
@@ -269,6 +295,8 @@ export default function App() {
     } else {
       trackPillClick(label)
     }
+    setShowMap(false)
+    setNextWeekend(false)
     const ap = PILLS.find((p) => p.label === label)
     if (!(ap?.type === 'category' || ap?.type === 'tagGroup' || ap?.type === 'seasonalType')) setAmenities([])
     // Auto-deactivate month filter when leaving Events pill
@@ -285,6 +313,7 @@ export default function App() {
     setSelectedMonthFilter(null)
     setShowMap(false)
     setOpenEventId(null)
+    setNextWeekend(false)
     window.scrollTo(0, 0)
   }
 
@@ -354,7 +383,9 @@ export default function App() {
     if (searchDetectedPill && activePill && !matchesPill(ev, activePill)) return false
     if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
 
+    if (city && (ev.city || '') !== city) return false
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
+    if (nextWeekend && ev.startDate && !isNextWeekend(ev.startDate)) return false
     // NEW: Month filter based on selectedMonthFilter
     if (selectedMonthFilter && ev.startDate && !isInMonth(ev.startDate, selectedMonthFilter)) return false
     return true
@@ -677,319 +708,225 @@ const filtered = base.filter((ev) => {
     }] : []),
   ]
 
+  // ---- Redesign view model -------------------------------------------------
+  // Cities for the Near picker: every city that has something upcoming on the
+  // current page (or anywhere, on Home), so the list never offers an empty one.
+  const cityOptions = [...new Set(
+    events
+      .filter((ev) => (activePill ? matchesPill(ev, activePill) : true))
+      .filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
+      .map((ev) => ev.city)
+      .filter(Boolean),
+  )].sort()
+
+  // Big swipe cards are the editor picks (the existing `featured` flag).
+  const featured = upcoming.filter((ev) => ev.isEditorPick)
+  const rest = upcoming.filter((ev) => !ev.isEditorPick)
+  const bigLabel = featureLabel(pill)
+  const restWords = countLabel(pill, 2).replace(/^\d+\s+/, '').replace(/\s+to\s.*$/, '')
+
+  const openSheet = (ev, play = false) => { trackEventClickThrough(ev.title, play ? 'watch_video' : 'expand'); setSheetAutoPlay(!!play); setOpenEventId(ev.id) }
+
+  // Events gets date chips instead of amenity pills.
+  const dateChips = showDateChips ? [
+    { key: 'wk', label: 'This weekend', on: weekend, run: () => { setWeekend((v) => !v); setNextWeekend(false); setSelectedMonthFilter(null); trackFilterApplied('weekend', !weekend ? 'enabled' : 'disabled') } },
+    { key: 'nwk', label: 'Next weekend', on: nextWeekend, run: () => { setNextWeekend((v) => !v); setWeekend(false); setSelectedMonthFilter(null) } },
+    ...monthFilters.map((m) => ({
+      key: m.key, label: `All ${m.label}`, on: selectedMonthFilter === m.key,
+      run: () => { setSelectedMonthFilter(selectedMonthFilter === m.key ? null : m.key); setWeekend(false); setNextWeekend(false) },
+    })),
+    { key: 'free', label: 'Free', on: freeOnly, run: toggleFreeOnly },
+  ] : []
+
+  const pageSubtitle = loading ? 'Loading...' : (() => {
+    const t = countLabel(pill, upcoming.length)
+    return t.charAt(0).toUpperCase() + t.slice(1) + (city ? ` in ${city}` : '')
+  })()
+
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#F7F4EF' }}>
-      {/* Header */}
-      <div style={{ background: 'white', padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '0.5px solid #E2DDD6' }}>
-        {/* The wordmark is a home link, which is the convention on desktop
-            and half-invisible on a phone. The house pill below is the visible
-            version of the same thing; both exist on purpose. */}
-        <div
-          onClick={goHome}
-          style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, letterSpacing: -0.5, cursor: 'pointer' }}
-        >
+      {/* Header: wordmark (home) and the Near [city] picker. */}
+      <div className="nx-top">
+        <button className="nx-brand" onClick={goHome} aria-label="Nexplore home">
           <span style={{ color: '#1A6B4A' }}>Ne</span><span style={{ color: '#C94F2C' }}>x</span><span style={{ color: '#1A6B4A' }}>plore</span>
-        </div>
-        <div style={{ fontSize: 10, color: '#888880', marginTop: 2, fontStyle: 'italic' }}>Family adventures in your neighborhood</div>
+        </button>
+        <label className="nx-near" htmlFor="nx-city">Near
+          {/* Old shared links may carry ?region=South Bay etc. Keep honoring
+              them and show the region here, so it can be seen and cleared. */}
+          <select id="nx-city" value={region && !city ? `region:${region}` : (city || '')} onChange={(e) => { const v = e.target.value; setRegion(v.startsWith('region:') ? v.slice(7) : null); setCity(v && !v.startsWith('region:') ? v : null) }}>
+            <option value="">All Bay Area</option>
+            {region && <option value={`region:${region}`}>{region}</option>}
+            {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            {city && !cityOptions.includes(city) && <option value={city}>{city}</option>}
+          </select>
+        </label>
       </div>
 
-      {/* Search bar.
-          SHOW_SEARCH is off for this release. The box matched title and
-          description only, so "free events this weekend" and "near me" both
-          returned nothing, and a search box that fails on the obvious query
-          costs more trust than it earns. The state, the URL param and the
-          intent detection all stay wired up, so turning the flag back on is
-          the whole of bringing it back.
-
-          The filter button used to live INSIDE this bar, which means hiding the
-          bar would have taken the filter drawer with it. It moves out here
-          instead, and only on list pages, since there is nothing to filter on
-          home. */}
-      {SHOW_SEARCH ? (
-        <div style={{ padding: '10px 16px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', background: 'white', borderRadius: 50, border: '1px solid #E2DDD6', padding: '0 6px 0 14px', height: 44, boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }}>
-            <SearchIcon />
-            <input
-              type="text" value={search} onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search events, parks, farms..."
-              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: '#2D2D2D', padding: '0 10px', fontFamily: "'DM Sans', sans-serif" }}
-            />
-            <div onClick={() => setDrawerOpen(true)} style={{ width: 34, height: 34, borderRadius: '50%', background: filterCount > 0 ? '#1A6B4A' : '#F7F4EF', border: `1px solid ${filterCount > 0 ? '#1A6B4A' : '#E2DDD6'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, position: 'relative' }}>
-              <FilterIcon active={filterCount > 0} />
-              {filterCount > 0 && <div style={{ position: 'absolute', top: -3, right: -3, width: 14, height: 14, borderRadius: '50%', background: '#C94F2C', color: 'white', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</div>}
-            </div>
-          </div>
-        </div>
-      ) : !isHome ? (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 16px 0' }}>
-          <div onClick={() => setDrawerOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 20, background: filterCount > 0 ? '#1A6B4A' : 'white', border: `1px solid ${filterCount > 0 ? '#1A6B4A' : '#E2DDD6'}`, cursor: 'pointer', position: 'relative' }}>
-            <FilterIcon active={filterCount > 0} />
-            <span style={{ fontSize: 10, fontWeight: 600, color: filterCount > 0 ? 'white' : '#888880' }}>Filters</span>
-            {filterCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, width: 15, height: 15, borderRadius: '50%', background: '#C94F2C', color: 'white', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</div>}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Category / theme pills */}
-      <div style={{ display: 'flex', gap: 6, padding: '10px 0 0 16px', overflowX: 'auto' }}>
-        {/* Icon rather than the word HOME on purpose. In a row of word-pills an
-            icon reads as "not a category", which is exactly what it is. HOME
-            spelled out sits next to Playground and Beaches and recreates the
-            confusion the All pill had. */}
-        <div
-          onClick={goHome}
-          title="Home"
-          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 26, borderRadius: 20, border: `0.5px solid ${isHome ? '#1A6B4A' : '#E2DDD6'}`, background: isHome ? '#1A6B4A' : 'white', cursor: 'pointer' }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isHome ? 'white' : '#888880'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3.5 10.5 12 3.5l8.5 7" />
-            <path d="M5.5 9.5V20h13V9.5" />
-            <path d="M9.8 20v-5.4h4.4V20" />
-          </svg>
-        </div>
-        {PILLS.filter((p) => !p.hidden).map((p) => (
-          <div key={p.label} onClick={() => choosePill(p.label)} style={{ flexShrink: 0, fontSize: 10, fontWeight: 500, padding: '4px 12px', borderRadius: 20, border: `0.5px solid ${pill === p.label ? themeFor(p.label).pillActiveBorder : '#E2DDD6'}`, color: pill === p.label ? 'white' : '#888880', background: pill === p.label ? themeFor(p.label).pillActiveBg : 'white', cursor: 'pointer' }}>{p.label}</div>
-        ))}
-      </div>
+      {/* Category circles replace the old pill row on every page. */}
+      <CategoryRow active={pill} onPick={choosePill} />
 
       {isHome ? (
         <Home countFor={countFor} onPick={choosePill} />
       ) : (
         <>
-      {/* Amenity sub-filters — only when category or Water Play active, excluding family-friendly */}
-      {showAmenities && amenityOptions.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, padding: '8px 0 0 16px', overflowX: 'auto' }}>
-        {amenityOptions.map((name) => {
-  const on = amenities.includes(name)
-  const label = getAmenityLabel(name)
-  return (
-    <div key={name} onClick={() => toggleAmenity(name)} style={{ flexShrink: 0, fontSize: 10, fontWeight: on ? 600 : 500, padding: '4px 11px', borderRadius: 20, border: `0.5px solid ${on ? theme.chipOnBorder : '#E2DDD6'}`, color: on ? theme.chipOnFg : '#888880', background: on ? theme.chipOnBg : 'white', cursor: 'pointer' }}>{label}</div>
-  )
-})}
-        </div>
-      )}
-
-      {/* Month Filters - Dynamic Current + Next 2 Months (UPDATED) */}
-      {showDateChips && (
-        <div style={{ display: 'flex', gap: 6, padding: '7px 16px 9px', borderBottom: '0.5px solid #E2DDD6', overflowX: 'auto' }}>
-          {monthFilters.map((monthFilter, idx) => (
-            <div
-              key={monthFilter.key}
-              onClick={() => {
-                setSelectedMonthFilter(
-                  selectedMonthFilter === monthFilter.key ? null : monthFilter.key
+          {/* Filter pills + page title stay pinned under the header while scrolling. */}
+          <div className="nx-stick">
+          {/* Filter pills: the page's own amenity list, or date chips on Events. */}
+          {showAmenities && amenityOptions.length > 0 && (
+            <div className="nx-subpills">
+              {amenityOptions.map((name) => {
+                const on = amenities.includes(name)
+                return (
+                  <button key={name} className={`nx-sub${on ? ' on' : ''}`} onClick={() => toggleAmenity(name)}>
+                    {getAmenityLabel(name)}
+                  </button>
                 )
-                setWeekend(false)
-              }}
-              style={{
-                flexShrink: 0,
-                fontSize: 10,
-                fontWeight: selectedMonthFilter === monthFilter.key ? 600 : 500,
-                padding: '3px 10px',
-                borderRadius: 20,
-                border: `0.5px solid ${selectedMonthFilter === monthFilter.key ? '#1A6B4A' : '#E2DDD6'}`,
-                color: selectedMonthFilter === monthFilter.key ? '#1A6B4A' : '#888880',
-                background: selectedMonthFilter === monthFilter.key ? '#E8F5EE' : 'white',
-                cursor: 'pointer'
-              }}
-            >
-              📅 {monthFilter.label}
+              })}
             </div>
-          ))}
-          {/* Keep This weekend and Free only chips */}
-          {chips.slice(1).map(({ label, active, toggle }) => (
-            <div key={label} onClick={toggle} style={{ flexShrink: 0, fontSize: 10, fontWeight: active ? 600 : 500, padding: '3px 10px', borderRadius: 20, border: `0.5px solid ${active ? '#1A6B4A' : '#E2DDD6'}`, color: active ? '#1A6B4A' : '#888880', background: active ? '#E8F5EE' : 'white', cursor: 'pointer' }}>{label}</div>
-          ))}
-        </div>
-      )}
-
-      {/* Divider when no date chips showing */}
-      {!showDateChips && (
-        <div style={{ borderBottom: '0.5px solid #E2DDD6', margin: '7px 0 0' }} />
-      )}
-
-      {/* Count, with the view toggle and Save or share alongside it.
-          The floating map button tested as easy to miss, and on its own it
-          never told anyone they were currently looking at a list. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 16px 6px' }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: '#888880', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-          {loading ? 'Loading...' : countLabel(pill, upcoming.length)}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {!loading && mappable.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'white', border: '0.5px solid #E2DDD6', borderRadius: 20, padding: 2 }}>
-              <div
-                onClick={() => setShowMap(false)}
-                style={{ padding: '4px 10px', borderRadius: 20, fontSize: 9, fontWeight: showMap ? 500 : 700, background: showMap ? 'transparent' : '#2D2D2D', color: showMap ? '#888880' : 'white', cursor: 'pointer' }}
-              >
-                List
-              </div>
-              <div
-                onClick={() => openMap('header_toggle')}
-                style={{ padding: '4px 10px', borderRadius: 20, fontSize: 9, fontWeight: showMap ? 700 : 500, background: showMap ? '#2D2D2D' : 'transparent', color: showMap ? 'white' : '#888880', cursor: 'pointer' }}
-              >
-                Map
-              </div>
+          )}
+          {dateChips.length > 0 && (
+            <div className="nx-subpills">
+              {dateChips.map((c) => (
+                <button key={c.key} className={`nx-sub${c.on ? ' on' : ''}`} onClick={c.run}>{c.label}</button>
+              ))}
             </div>
           )}
 
-          {!loading && upcoming.length > 0 && (
-            <div
-              onClick={shareView}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: theme.accentSoft, border: `0.5px solid ${theme.accent}33`, borderRadius: 20, cursor: 'pointer' }}
-            >
-              <ShareGlyph size={11} color={theme.accent} />
-              <span style={{ fontSize: 9, fontWeight: 700, color: theme.accent, whiteSpace: 'nowrap' }}>Save or share</span>
+          <PageHead
+            title={pill || 'Search results'}
+            subtitle={pageSubtitle}
+            showMap={!loading && mappable.length > 0}
+            mapOn={showMap}
+            onMap={() => (showMap ? setShowMap(false) : openMap('header_toggle'))}
+            onShare={!loading && upcoming.length > 0 ? (showMap ? shareMap : shareView) : null}
+          />
+          </div>
+
+          {error && (
+            <div style={{ margin: '0 16px 10px', padding: '10px 14px', borderRadius: 10, background: '#FEF0E6', border: '0.5px solid #C94F2C', fontSize: 12, color: '#C94F2C' }}>⚠️ {error}</div>
+          )}
+
+          {!loading && allOutOfSeason && (
+            <div style={{ margin: '0 16px 10px', padding: '10px 14px', borderRadius: 10, background: '#FEF0E6', border: '0.5px solid #EFCFB6' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#2D2D2D', marginBottom: 2 }}>{outOfSeasonHeadline(pill)}</div>
+              <div style={{ fontSize: 11, color: '#7A6A5C', lineHeight: 1.5 }}>Here's where to go when they're back. Each one shows the month it reopens.</div>
             </div>
           )}
-        </div>
-      </div>
 
-      {error && (
-        <div style={{ margin: '0 16px 10px', padding: '10px 14px', borderRadius: 10, background: '#FEF0E6', border: '0.5px solid #C94F2C', fontSize: 12, color: '#C94F2C' }}>⚠️ {error}</div>
-      )}
-
-      {/* The whole category is out of season. Say so plainly at the top rather
-          than letting a page of badged cards imply the site is broken. The
-          cards stay, because "where do we go when they're back" is a real
-          question in March. When RAG later wants a category hidden outright
-          rather than explained, this is where that switch goes. */}
-      {!loading && allOutOfSeason && (
-        <div style={{ margin: '0 16px 10px', padding: '10px 14px', borderRadius: 10, background: '#FEF0E6', border: '0.5px solid #EFCFB6' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#2D2D2D', marginBottom: 2 }}>
-            {outOfSeasonHeadline(pill)}
-          </div>
-          <div style={{ fontSize: 11, color: '#7A6A5C', lineHeight: 1.5 }}>
-            Here's where to go when they're back. Each one shows the month it reopens.
-          </div>
-        </div>
-      )}
-
-      {/* Grid.
-          hidePrice is resolved per EVENT as well as per pill: a search, or a
-          shared ?event= link, renders a mixed list with no pill active, and a
-          Boat Rides card must stay priceless in that list too.
-
-          EXPANSION, and why the `order` arithmetic is there.
-
-          Events only, for now. Learn more opens the card in place instead of
-          throwing someone out to a third-party site they then have to navigate
-          back from.
-
-          An open card spans both columns. That alone is fine for a card in the
-          LEFT column: it is already first in its row, so it widens and its
-          right-hand neighbour drops to the next row. A card in the RIGHT column
-          has no such luck, and would jump down a row to find the space, which
-          reads as the card you just tapped running away from your thumb.
-
-          So each card carries an explicit `order` of i * 2, leaving odd numbers
-          free between them. Opening a right-column card sets its order to
-          i * 2 - 3, which slots it BEFORE its left-hand neighbour: the open
-          card keeps the row it was already in, and the neighbour is the thing
-          that moves. Closing restores i * 2. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, padding: '0 16px 24px' }}>
-        {loading
-          ? [1, 2, 3, 4].map((i) => <EventCardSkeleton key={i} />)
-          : packCards(upcoming).map(({ ev, wide }) => {
-              const isOpen = canExpand && expandedId === ev.id
-              const full = wide || isOpen
-              return (
-                <div
-                  key={ev.id}
-                  style={{ minWidth: 0, gridColumn: full ? '1 / -1' : undefined }}
-                >
-                  <EventCard
-                    event={ev}
-                    theme={theme}
-                    onSelect={openOfficial}
-                    onDirections={openDirections}
-                    onShare={shareEvent}
-                    isEditorPick={ev.isEditorPick}
-                    hidePrice={hidePrice || hidesPriceForEvent(ev)}
-                    expanded={isOpen}
-                    onToggleExpand={canExpand ? toggleExpand : null}
-                    wide={full}
-                  />
+          {showMap ? (
+            // The map sits inside the page: everything above stays put and
+            // only the listing area swaps out.
+            <div className="nx-mapbox">
+              <MapView
+                contained
+                events={mappable}
+                theme={theme}
+                pin={pinStyleFor(activePill?.label)}
+                onSelect={openOfficial}
+                onDirections={openDirections}
+                onShare={shareEvent}
+                onShareView={shareMap}
+                onPinClick={(ev) => trackMapPinClick(ev.title, pill)}
+                onClose={() => setShowMap(false)}
+                hidePrice={hidePrice}
+              />
+            </div>
+          ) : loading ? (
+            <div className="nx-section"><div className="nx-list">{[1, 2, 3, 4].map((i) => <div key={i} style={{ padding: 12 }}><EventCardSkeleton /></div>)}</div></div>
+          ) : (
+            <>
+              {featured.length > 0 && (
+                <div className="nx-bigrow">
+                  {featured.map((ev) => (
+                    <FeatureCard theme={theme}
+                      key={ev.id}
+                      ev={ev}
+                      page={pill}
+                      onLearnMore={openSheet}
+                      onOfficial={openOfficial}
+                      onDirections={openDirections}
+                      onShare={shareEvent}
+                      hidePrice={hidePrice || hidesPriceForEvent(ev)}
+                    />
+                  ))}
                 </div>
-              )
-            })}
-      </div>
+              )}
 
-      {/* Past events */}
-      {!loading && past.length > 0 && (
-        <>
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.6px', padding: '8px 16px 6px', borderTop: '0.5px solid #E2DDD6' }}>Past events</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, padding: '0 16px 20px', opacity: 0.5 }}>
-            {past.map((ev) => <EventCard key={ev.id} event={ev} theme={theme} onSelect={openOfficial} onDirections={openDirections} onShare={shareEvent} hidePrice={hidePrice || hidesPriceForEvent(ev)} />)}
-          </div>
+              {rest.length > 0 && (
+                <div className="nx-section">
+                  {featured.length > 0 && <h2>More {restWords}<span>{rest.length}</span></h2>}
+                  <div className="nx-list">
+                    {rest.map((ev) => (
+                      <CompactRow theme={theme} page={pill}
+                        key={ev.id}
+                        ev={ev}
+                        canExpand
+                        expanded={false}
+                        onToggle={openSheet}
+                        onOfficial={openOfficial}
+                        onDirections={openDirections}
+                        onShare={shareEvent}
+                        onCalendar={addToCalendar}
+                        hidePrice={hidePrice || hidesPriceForEvent(ev)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {past.length > 0 && (
+                <div className="nx-section" style={{ opacity: 0.55, marginTop: 14 }}>
+                  <h2>Past events<span>{past.length}</span></h2>
+                  <div className="nx-list">
+                    {past.map((ev) => (
+                      <CompactRow theme={theme} page={pill} key={ev.id} ev={ev} canExpand expanded={false} onToggle={openSheet} onOfficial={openOfficial} onDirections={openDirections} onShare={shareEvent} onCalendar={addToCalendar} hidePrice={hidePrice || hidesPriceForEvent(ev)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {upcoming.length === 0 && !error && (
+                base.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '50px 24px' }}>
+                    <div style={{ fontSize: 44, marginBottom: 14 }}>🚧</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 6 }}>Coming soon</div>
+                    <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7 }}>We're still adding things to do here — check back soon.</div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '50px 24px' }}>
+                    <div style={{ fontSize: 44, marginBottom: 14 }}>🌿</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 6 }}>No events found</div>
+                    <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7 }}>Try removing a filter or choosing a different city.</div>
+                  </div>
+                )
+              )}
+            </>
+          )}
+          <div style={{ height: 80 }} />
+
+          {/* Floating map button, bottom middle, same as today. */}
+          {!loading && mappable.length > 0 && !showMap && !openEvent && !shareTarget && (
+            <button
+              onClick={() => { openMap('floating_button'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+              style={{
+                position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 22, zIndex: 950,
+                display: 'flex', alignItems: 'center', gap: 8, background: '#2D2D2D', color: 'white',
+                border: '2.5px solid white', borderRadius: 50, padding: '13px 24px', fontSize: 14, fontWeight: 700,
+                fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', boxShadow: '0 8px 24px rgba(0,0,0,0.34)',
+              }}
+            >
+              🗺 Show map · {mappable.length}
+            </button>
+          )}
         </>
       )}
 
-      {/* Empty state — pill-level "Coming soon" (zero matches before any sub-pill filter)
-          vs. the existing "no results" message (a sub-pill/amenity combo emptied out an otherwise populated pill) */}
-      {!loading && upcoming.length === 0 && !error && (
-        base.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px 24px' }}>
-            <div style={{ fontSize: 44, marginBottom: 14 }}>🚧</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 6 }}>Coming soon</div>
-            <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7 }}>We're still adding things to do here — check back soon.</div>
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '50px 24px' }}>
-            <div style={{ fontSize: 44, marginBottom: 14 }}>🌿</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 6 }}>No events found</div>
-            <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7 }}>Try removing a filter or selecting a different neighborhood.</div>
-          </div>
-        )
-      )}
-      <div style={{ height: 72 }} />
-
-      {/* Floating list/map toggle. An add-on to the list, never a replacement —
-          the list stays the default view on every load. */}
-      {!loading && mappable.length > 0 && !drawerOpen && !showMap && !openEvent && !shareTarget && (
-        <button
-          onClick={() => openMap('floating_button')}
-          style={{
-            position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 22, zIndex: 950,
-            display: 'flex', alignItems: 'center', gap: 8, background: '#2D2D2D', color: 'white',
-            border: '2.5px solid white', borderRadius: 50, padding: '13px 24px', fontSize: 14, fontWeight: 700,
-            fontFamily: "'DM Sans', sans-serif", cursor: 'pointer',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.34)',
-          }}
-        >
-          🗺 Show map · {mappable.length}
-        </button>
-      )}
-
-      {showMap && (
-        <MapView
-          events={mappable}
-          theme={theme}
-          pin={pinStyleFor(activePill?.label)}
-          onSelect={openOfficial}
-          onDirections={openDirections}
-          onShare={shareEvent}
-          onShareView={shareMap}
-          onPinClick={(ev) => trackMapPinClick(ev.title, pill)}
-          onClose={() => setShowMap(false)}
-          hidePrice={hidePrice}
-        />
-      )}
-        </>
-      )}
-
-      <FilterDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} region={region} setRegion={setRegion} freeOnly={freeOnly} setFreeOnly={setFreeOnly} />
-
-      {/* What a shared link lands on. Only mounts once the row it names has
-          actually loaded, so a bad or stale id just shows the normal list. */}
-      {/* hidePrice follows the EVENT's own category here, not just the active
-          pill. A shared ?event= link opens this sheet with no pill set at all,
-          and a Boat Rides venue must stay priceless however it was reached. */}
+      {/* Learn more on a big card, and every shared ?event= link, open here. */}
       <EventSheet
         event={openEvent}
         theme={theme}
-        onClose={() => setOpenEventId(null)}
+        autoPlay={sheetAutoPlay}
+        onClose={() => { setOpenEventId(null); setSheetAutoPlay(false) }}
         onSelect={openOfficial}
         onDirections={openDirections}
         onShare={shareEvent}

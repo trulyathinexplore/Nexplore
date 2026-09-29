@@ -124,7 +124,7 @@ export function EventCardSkeleton() {
 // An all-day .ics the browser downloads. DTEND is exclusive in the spec, so a
 // one-day event needs tomorrow's date or every calendar app renders it as
 // zero-length and some hide it outright.
-function addToCalendar(event) {
+export function addToCalendar(event) {
   if (!event.startDate) return
   const compact = (d) => d.replace(/-/g, '')
   const plusOne = (d) => {
@@ -606,7 +606,96 @@ export function ShareSheet({ open, onClose, heading, subheading, url, tiles, cop
 // What a shared link opens onto. Deliberately a sheet over the list rather than
 // a separate page: the recipient sees the one place their friend meant, and
 // closing it leaves them browsing everything else.
-export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null), hidePrice = false }) {
+// Top of the Learn more sheet. With a video: the photo carries a Watch
+// button, and tapping it (or arriving via a card's Watch button) swaps the
+// photo for the player right here, so nobody leaves Nexplore. The file only
+// downloads once someone presses play.
+const PORTRAIT_BOX = { position: 'relative', background: '#111', height: 'min(62vh, 560px)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '20px 20px 0 0', overflow: 'hidden' }
+
+function SheetMedia({ event, autoPlay }) {
+  const [playing, setPlaying] = useState(!!(autoPlay && event.videoUrl))
+  const [muted, setMuted] = useState(true)
+  const [paused, setPaused] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => { setPlaying(!!(autoPlay && event.videoUrl)) }, [event.id, autoPlay])
+  useEffect(() => {
+    const v = ref.current
+    if (!playing || !v) return
+    // Always starts muted (like Instagram), so it never blasts sound.
+    v.muted = true
+    setMuted(true)
+    v.play().catch(() => {})
+  }, [playing])
+  const toggleSound = (e) => {
+    e.stopPropagation()
+    const v = ref.current
+    if (!v) return
+    v.muted = !v.muted
+    setMuted(v.muted)
+    if (v.paused) v.play().catch(() => {})
+  }
+  const togglePause = () => {
+    const v = ref.current
+    if (!v) return
+    if (v.paused) { v.play().catch(() => {}); setPaused(false) } else { v.pause(); setPaused(true) }
+  }
+  if (playing) {
+    return (
+      <div onClick={togglePause} style={{ ...PORTRAIT_BOX, cursor: 'pointer' }}>
+        <video
+          ref={ref}
+          src={event.videoUrl}
+          poster={sizedImageUrl(event.imageUrl) || undefined}
+          muted
+          loop
+          playsInline
+          autoPlay
+          preload="auto"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+        {paused && (
+          <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 60, height: 60, borderRadius: '50%', background: 'rgba(20,20,20,0.55)', display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+            <svg viewBox="0 0 24 24" width="28" height="28" style={{ marginLeft: 3 }}><path d="M8 5v14l11-7z" fill="white" /></svg>
+          </span>
+        )}
+        <button
+          onClick={toggleSound}
+          aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
+          style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 2, display: 'flex', alignItems: 'center', gap: 7, padding: muted ? '8px 14px 8px 10px' : 8, border: 0, borderRadius: 999, background: 'rgba(20,20,20,0.66)', color: 'white', font: "700 13px 'DM Sans', sans-serif", cursor: 'pointer', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+        >
+          {muted ? (
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4z" fill="white" /><path d="M23 9l-6 6M17 9l6 6" /></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4z" fill="white" /><path d="M15.5 8.5a5 5 0 010 7M19 5a10 10 0 010 14" /></svg>
+          )}
+          {muted && 'Tap for sound'}
+        </button>
+      </div>
+    )
+  }
+  // No video: today's landscape photo. With a video: the same tall portrait
+  // box as the player, however the sheet was opened.
+  if (!event.videoUrl) return <EventImage event={event} height={190} />
+  return (
+    <div style={PORTRAIT_BOX}>
+      <EventImage event={event} height={'100%'} />
+      {event.videoUrl && (
+        <button
+          onClick={() => setPlaying(true)}
+          aria-label="Watch video"
+          style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 6px', border: 0, borderRadius: 999, background: 'rgba(20,20,20,0.62)', color: 'white', font: "700 14px 'DM Sans', sans-serif", cursor: 'pointer', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+        >
+          <span style={{ width: 38, height: 38, borderRadius: '50%', background: 'white', color: '#C94F2C', display: 'grid', placeItems: 'center' }}>
+            <svg viewBox="0 0 24 24" width="20" height="20" style={{ marginLeft: 2 }}><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
+          </span>
+          Watch video
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null), hidePrice = false, autoPlay = false }) {
   if (!event) return null
 
   // The emoji badge line at the end of a description is internal metadata that
@@ -641,16 +730,16 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
         style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto', paddingBottom: 26 }}
       >
         <div style={{ position: 'relative' }}>
-          <EventImage event={event} height={190} />
+          <SheetMedia key={event.id} event={event} autoPlay={autoPlay} />
           <div
             onClick={onClose}
-            style={{ position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, lineHeight: 1, color: '#2D2D2D' }}
+            style={{ zIndex: 2, position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, lineHeight: 1, color: '#2D2D2D' }}
           >
             ×
           </div>
           <div
             onClick={() => onShare(event)}
-            style={{ position: 'absolute', top: 4, right: 4, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            style={{ zIndex: 2, position: 'absolute', top: 4, right: 4, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
           >
             <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.95)', boxShadow: '0 1px 6px rgba(0,0,0,0.24)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShareGlyph size={16} color="#2D2D2D" />

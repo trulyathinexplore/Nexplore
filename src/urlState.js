@@ -32,6 +32,8 @@ export function readFilters(search, pillLabels, regions) {
     // would preview as the generic home card. This one the edge function can
     // see, and give its own preview.
     section: p.get('section') || null,
+    // Redesign: the Near [city] picker. Stored as the city name itself.
+    city: p.get('city') || null,
   }
 }
 
@@ -54,6 +56,7 @@ export function writeFilters(f) {
   // which reads the URL on every render, finds nothing on its second pass and
   // silently never scrolls.
   if (f.section) p.set('section', f.section)
+  if (f.city) p.set('city', f.city)
   const qs = p.toString()
   const url = qs ? `${location.pathname}?${qs}` : location.pathname
   window.history.replaceState(null, '', url)

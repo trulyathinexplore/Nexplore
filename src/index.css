@@ -15,3 +15,97 @@ button{cursor:pointer;border:none;background:none}
 @keyframes fadeIn{0%{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .serif{font-family:'Playfair Display',Georgia,serif}
 .fade-in{animation:fadeIn .3s ease both}
+
+/* ---------------------------------------------------------------------------
+   Explore redesign (Sep 2026). Scoped under .nx-* so nothing else moves.
+   --------------------------------------------------------------------------- */
+.nx-top{position:sticky;top:0;z-index:40;background:var(--sand);border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px 10px}
+.nx-brand{font-family:'Playfair Display',Georgia,serif;font-size:22px;font-weight:800;letter-spacing:-.4px;cursor:pointer;background:none;padding:0}
+.nx-near{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.nx-near select{font:inherit;font-weight:600;font-size:13px;color:var(--charcoal);background:#fff;border:1px solid var(--border);border-radius:999px;padding:6px 26px 6px 12px;max-width:170px;-webkit-appearance:none;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,#888880 50%),linear-gradient(135deg,#888880 50%,transparent 50%);background-position:calc(100% - 14px) 52%,calc(100% - 9px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.nx-cats{display:flex;gap:14px;overflow-x:auto;padding:12px 16px 4px}
+.nx-cat{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:60px;padding:0}
+.nx-cat-img{width:56px;height:56px;border-radius:50%;overflow:hidden;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.nx-cat-img img{width:100%;height:100%;object-fit:cover;display:block}
+.nx-cat.on .nx-cat-img{outline:2.5px solid #C94F2C;outline-offset:2px}
+.nx-cat-label{font-size:11px;font-weight:600;color:var(--charcoal);white-space:nowrap}
+.nx-cat.on .nx-cat-label{font-weight:700}
+.nx-subpills{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 2px}
+.nx-sub{flex:0 0 auto;padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:13px;font-weight:600;color:var(--charcoal);white-space:nowrap;cursor:pointer}
+.nx-sub.on{background:var(--green-light);border-color:var(--green);color:var(--green-dark)}
+.nx-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 10px}
+.nx-head h1{margin:0;font-family:'Playfair Display',Georgia,serif;font-size:21px;font-weight:700;line-height:1.15;color:var(--charcoal)}
+.nx-head p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+.nx-headbtns{display:flex;gap:6px;flex:0 0 auto;padding-top:2px}
+.nx-hbtn{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 11px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12.5px;font-weight:700;color:var(--charcoal);cursor:pointer}
+.nx-hbtn.on{background:var(--charcoal);border-color:var(--charcoal);color:#fff}
+.nx-bigrow{display:flex;gap:12px;overflow-x:auto;padding:2px 16px 10px;scroll-snap-type:x mandatory}
+.nx-big{flex:0 0 63%;min-width:230px;max-width:300px;scroll-snap-align:start;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(32,26,18,.05),0 5px 14px rgba(32,26,18,.08);display:flex;flex-direction:column}
+.nx-bigrow .nx-big:only-child{flex-basis:84%;max-width:380px}
+.nx-art{position:relative;cursor:pointer}
+.nx-stamp{align-self:flex-start;background:#fff;color:var(--charcoal);border-radius:9px;padding:4px 8px;font-size:10px;font-weight:800;letter-spacing:.03em;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.nx-tag{align-self:flex-start;background:#C94F2C;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px}
+.nx-cshare{position:absolute;right:6px;top:6px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.95);box-shadow:0 1px 6px rgba(0,0,0,.24);display:grid;place-items:center;cursor:pointer}
+.nx-bigbody{padding:10px 11px 12px;display:flex;flex-direction:column;gap:5px;flex:1}
+.nx-bigbody h3{margin:0;font-size:14px;font-weight:700;line-height:1.25;color:var(--charcoal);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nx-meta{font-size:11.5px;color:var(--muted)}
+.nx-pills{display:flex;flex-wrap:wrap;gap:5px}
+.nx-pill{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--sand-dark);color:var(--charcoal)}
+.nx-pill.free{background:var(--green-light);color:var(--green-dark)}
+.nx-pill.res{background:#FEF0E6;color:#C94F2C}
+.nx-actions{display:flex;gap:7px;margin-top:auto;padding-top:6px}
+.nx-btn{flex:1;padding:8px 0;border-radius:10px;border:1px solid var(--green);background:#fff;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.nx-btn.more{border-color:var(--border);background:var(--sand);color:var(--charcoal)}
+.nx-btn.solid{background:var(--green);color:#fff}
+.nx-btn.solo{background:var(--green);color:#fff}
+.nx-section{padding:6px 16px 0}
+.nx-section h2{margin:6px 0 10px;font-family:'Playfair Display',Georgia,serif;font-size:19px;font-weight:700;color:var(--charcoal)}
+.nx-section h2 span{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
+.nx-list{}
+.nx-small{display:grid;grid-template-columns:46% minmax(0,1fr);gap:12px;padding:12px;background:#fff;border-radius:16px;margin:0 0 12px;box-shadow:0 1px 2px rgba(32,26,18,.05),0 4px 12px rgba(32,26,18,.07)}
+
+.nx-thumb{position:relative;min-height:168px;border-radius:12px;overflow:hidden;cursor:pointer;background:var(--sand-dark)}
+.nx-thumb img{position:absolute;inset:0;height:100%!important;object-fit:cover}
+.nx-dt{position:absolute;left:4px;bottom:4px;background:#fff;color:var(--charcoal);border-radius:7px;padding:3px 6px;font-size:9.5px;font-weight:800;letter-spacing:.03em;line-height:1.1;white-space:nowrap}
+.nx-smallbody{min-width:0;display:flex;flex-direction:column;gap:5px}
+.nx-smallbody h4{margin:0;font-size:15px;font-weight:700;line-height:1.28;color:var(--charcoal);cursor:pointer;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.nx-when{font-size:12px;font-weight:700;color:var(--green)}
+.nx-thumb .nx-cshare{width:30px;height:30px}
+.nx-dt{z-index:1}
+.nx-sshare{position:absolute;right:0;top:0;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:#fff;display:grid;place-items:center;cursor:pointer}
+.nx-details{margin-top:8px;padding-top:10px;border-top:.5px dashed var(--border);display:flex;flex-direction:column;gap:8px}
+.nx-details p{margin:0;font-size:13px;line-height:1.55;color:#5C5C56;white-space:pre-line}
+.nx-muted{color:#a8a29a!important;font-style:italic}
+.nx-facts{margin:0;display:grid;gap:4px}
+.nx-fact{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;font-size:12.5px}
+.nx-fact dt{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#a8a29a;padding-top:2px}
+.nx-fact dd{margin:0;color:var(--charcoal)}
+.nx-mapbox{position:relative;margin:0 16px 16px;height:min(64vh,560px);border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(32,26,18,.05),0 5px 14px rgba(32,26,18,.08)}
+
+/* Watch video badge on photos */
+.nx-play{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;padding:4px 11px 4px 4px;border:0;border-radius:999px;background:rgba(20,20,20,.62);color:#fff;font:700 12px 'DM Sans',sans-serif;cursor:pointer;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:2}
+.nx-play-dot{width:28px;height:28px;border-radius:50%;background:#fff;color:#C94F2C;display:grid;place-items:center}
+.nx-play-dot svg{margin-left:2px}
+.nx-play.big{left:auto;right:8px;bottom:8px}
+.nx-play.big .nx-play-dot{width:30px;height:30px}
+
+/* Pinned filter pills + page title under the sticky header */
+.nx-stick{position:sticky;top:var(--nx-top-h,53px);z-index:39;background:var(--sand);box-shadow:0 6px 8px -8px rgba(32,26,18,.25)}
+.nx-stick .nx-head{padding:10px 16px 8px}
+.nx-small,.nx-big{cursor:pointer}
+
+/* Restored photo badges (old EventCard look) */
+.nx-ptop,.nx-pbot{position:absolute;left:7px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;z-index:1;pointer-events:none;max-width:calc(100% - 50px)}
+.nx-ptop{top:7px}
+.nx-pbot{bottom:7px}
+.nx-ob{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;line-height:1.35;letter-spacing:.02em}
+
+/* Share sits at the right end of the title line, off the photo */
+.nx-titlerow{display:flex;align-items:flex-start;gap:8px}
+.nx-titlerow h3,.nx-titlerow h4{flex:1;min-width:0;padding-right:0!important}
+.nx-titlerow .nx-sshare{position:static;flex:0 0 30px}
+
+.nx-status{font-size:12px;font-weight:700}
+.nx-status.soon{color:#C94F2C}
+.nx-status.closed{color:#7a746d}
