@@ -109,3 +109,58 @@ button{cursor:pointer;border:none;background:none}
 .nx-status{font-size:12px;font-weight:700}
 .nx-status.soon{color:#C94F2C}
 .nx-status.closed{color:#7a746d}
+
+/* ---- Oct 2026 release ------------------------------------------------------ */
+/* Clear all pill (first pill, when 1+ filters are on) */
+.nx-sub.clear{background:var(--charcoal);border-color:var(--charcoal);color:#fff}
+/* "‹ Events" back button on Halloween / Pumpkin Patches when opened from Events */
+.nx-back{flex:0 0 auto;align-self:center;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12.5px;font-weight:700;color:var(--charcoal);cursor:pointer}
+
+/* Events: day ribbon */
+.nx-ribbon{display:flex;gap:6px;overflow-x:auto;padding:10px 16px 2px}
+.nx-rb{flex:0 0 auto;width:44px;border:1px solid var(--border);background:#fff;border-radius:12px;padding:5px 0 6px;display:flex;flex-direction:column;align-items:center;gap:1px;scroll-snap-align:start;color:var(--charcoal);cursor:pointer}
+.nx-rb small{font-size:9.5px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.nx-rb b{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.nx-rb.we{background:#FBF8F2}
+.nx-rb.none{opacity:.38;cursor:default}
+.nx-rb.on{background:var(--green);border-color:var(--green);color:#fff}
+.nx-rb.on small{color:#fff}
+.nx-rb.all{width:auto;padding:5px 12px;justify-content:center}
+.nx-rb.all b{font-size:13px}
+.nx-mon{flex:0 0 auto;align-self:center;font-size:10px;font-weight:800;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.08em}
+
+/* Events: section headings */
+.nx-secth{font-family:'Playfair Display',Georgia,serif;font-size:19px;font-weight:700;margin:4px 0 0;padding:0 16px 8px;color:var(--charcoal)}
+
+/* Events: Browse by interest mosaic */
+.nx-mosaic{position:relative;margin:0 13px}
+.nx-tile{position:absolute;border:0;border-radius:16px;padding:12px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;background-size:cover;background-position:center;cursor:pointer;
+  box-shadow:0 2px 3px rgba(32,26,18,.08),0 8px 18px rgba(32,26,18,.14);transition:transform .12s,box-shadow .12s}
+.nx-tile:active{transform:scale(.96);box-shadow:0 1px 2px rgba(32,26,18,.1)}
+.nx-tile[aria-pressed="true"]{box-shadow:0 0 0 3px #fff,0 0 0 5px currentColor}
+.nx-tile>span{position:relative;z-index:1;min-width:0}
+.nx-tc{display:block;font-family:'Playfair Display',Georgia,serif;font-size:30px;font-weight:700;line-height:1}
+.nx-tn{display:block;font-size:15px;font-weight:800;line-height:1.2;text-wrap:balance;padding-right:30px}
+.nx-tr{display:block;font-size:11px;font-weight:700;opacity:.85;padding-right:30px}
+.nx-tile.sm .nx-tc{font-size:22px}.nx-tile.sm .nx-tn{font-size:13px}.nx-tile.sm .nx-tr{display:none}
+.nx-hchips{display:flex;flex-wrap:nowrap;overflow:hidden;gap:3px;margin-top:5px;padding-right:26px}
+.nx-hchips.under{padding-right:0}
+.nx-hchips span{flex:0 0 auto;white-space:nowrap;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.8)}
+/* soft illustrated group tiles: dark text on a faded drawing, white fade behind the text */
+.nx-tile.soft .nx-tbg{position:absolute!important;inset:-6px;background-size:cover;background-position:center;filter:blur(1.5px) saturate(.95);opacity:var(--o,.5);z-index:0!important;pointer-events:none}
+.nx-tile.soft::after{content:"";position:absolute;left:0;right:0;bottom:0;height:62%;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.55));z-index:0;pointer-events:none}
+/* photo tiles: clear photo, white text */
+.nx-tile.photo{color:#fff}
+.nx-tile.photo::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.55));z-index:0}
+.nx-tile.photo .nx-hchips span{background:rgba(255,255,255,.22);color:#fff}
+.nx-freepill,.nx-go{position:absolute!important;right:8px;top:8px;z-index:2!important;white-space:nowrap;color:#fff;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:999px}
+.nx-freepill{background:var(--green)}
+.nx-go{background:#C94F2C}
+.nx-cue{position:absolute!important;right:8px;bottom:8px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.95);color:var(--charcoal);font-size:17px;font-weight:800;line-height:24px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.18);z-index:3!important}
+@keyframes nxnudge{0%,100%{transform:translateY(0)}30%{transform:translateY(-8px) scale(1.02);box-shadow:0 14px 24px rgba(32,26,18,.22)}55%{transform:translateY(0)}70%{transform:translateY(-3px)}}
+.nx-tile.first{animation:nxnudge 1.1s ease .6s 1}
+@media (prefers-reduced-motion:reduce){.nx-tile.first{animation:none}}
+.nx-glist{padding:14px 16px 0;scroll-margin-top:calc(var(--nx-top-h,53px) + 150px)}
+.nx-glist h3{margin:0 0 10px;font-size:17px;font-weight:800}
+.nx-less{display:block;width:100%;margin-top:2px;border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:700;padding:8px;cursor:pointer}
+.nx-sub.nx-rbpill{align-self:center}

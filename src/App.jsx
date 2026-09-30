@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
-import { PILLS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent, pinStyleFor } from './constants.js'
+import { PILLS, PAGE_AMENITY_LABELS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent, pinStyleFor } from './constants.js'
 import { sortClosedLast, isClosedForSeason } from './season.js'
 import {
   trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch,
@@ -19,6 +19,10 @@ import {
   targets, copyLink, canNativeShare, nativeShare,
 } from './share.js'
 import MapView from './components/MapView.jsx'
+import {
+  DayRibbon, Mosaic, SeasonCard, GROUPS, WIDE_CITIES, groupsOf, groupName, groupChips,
+  collapseSeries, seasonPagesNow, onDay, dayTitle,
+} from './components/EventsPage.jsx'
 import Home from './components/Home.jsx'
 const PILL_LABELS = PILLS.map((p) => p.label)
 
@@ -44,7 +48,7 @@ const outOfSeasonHeadline = (pillLabel) =>
 const MAP_ENABLED_PILLS = ['Pumpkin Patches', 'Playground']
 const REGION_LABELS = Object.keys(REGION_CITIES)
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
-const getAmenityLabel = (id) => AMENITY_LABELS[id] || prettify(id)
+const getAmenityLabel = (id, page) => PAGE_AMENITY_LABELS[page]?.[id] || AMENITY_LABELS[id] || prettify(id)
   const NOW = new Date()
 const CURRENT_MONTH = NOW.getMonth()
 const CURRENT_YEAR = NOW.getFullYear()
@@ -154,6 +158,13 @@ export default function App() {
   // Redesign: Near [city] picker and the Next weekend chip.
   const [city, setCity] = useState(init.city)
   const [nextWeekend, setNextWeekend] = useState(false)
+  // Events page (Oct 2026): the picked day on the ribbon (YYYY-MM-DD or null),
+  // the mosaic group whose list is open, and whether Halloween / Pumpkin
+  // Patches was reached from an Events tile (shows the "‹ Events" button).
+  const [dayPick, setDayPick] = useState(null)
+  const [openGroup, setOpenGroup] = useState(null)
+  const [backToEvents, setBackToEvents] = useState(false)
+  const groupListRef = useRef(null)
 
   // Calculate current and next 2 months dynamically
   const getCurrentAndNextMonths = () => {
@@ -192,7 +203,12 @@ export default function App() {
     writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap, section, city })
     // A card left open on one filter has no business being open on the next.
     setExpandedId(null)
-  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap, section, city, nextWeekend])
+  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap, section, city, nextWeekend, dayPick])
+
+  // A tapped mosaic tile opens its list below; bring it into view.
+  useEffect(() => {
+    if (openGroup && groupListRef.current) groupListRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [openGroup])
 
   // A real page_view per category. Without this GA sees one page_view for the
   // whole visit and every standard report collapses the site into a single
@@ -285,10 +301,28 @@ export default function App() {
   const showAmenities = !activePill?.noAmenities
     && (activePill?.type === 'category' || activePill?.type === 'tagGroup' || activePill?.type === 'seasonalType')
   // Only show date/time chips when Events pill is active
-  const showDateChips = activePill?.type === 'eventType'
+  const isEventsPage = activePill?.label === 'Events'
 
-  function choosePill(label) {
+  // Every filter starts fresh on every page change (Near, sub-pills, Free,
+  // dates). Shared links still arrive with their filters, because those are
+  // read from the URL on load, not set here.
+  function resetFilters() {
+    setRegion(null)
+    setCity(null)
+    setAmenities([])
+    setFreeOnly(false)
+    setWeekend(false)
+    setNextWeekend(false)
+    setSelectedMonthFilter(null)
+    setDayPick(null)
+    setOpenGroup(null)
+  }
+
+  function choosePill(label, opts = {}) {
     setPill(label)
+    resetFilters()
+    setBackToEvents(!!opts.fromEvents)
+    if (opts.scroll !== false) window.scrollTo(0, 0)
     // Track pill clicks (July 4th gets its own event)
     if (label === 'July 4th') {
       trackJuly4thFilter()
@@ -296,11 +330,6 @@ export default function App() {
       trackPillClick(label)
     }
     setShowMap(false)
-    setNextWeekend(false)
-    const ap = PILLS.find((p) => p.label === label)
-    if (!(ap?.type === 'category' || ap?.type === 'tagGroup' || ap?.type === 'seasonalType')) setAmenities([])
-    // Auto-deactivate month filter when leaving Events pill
-    if (ap?.type !== 'eventType') setSelectedMonthFilter(null)
   }
 
   // Back to the front door, from the home pill or the wordmark. Clears every
@@ -309,11 +338,10 @@ export default function App() {
   function goHome() {
     setPill(null)
     setSearch('')
-    setAmenities([])
-    setSelectedMonthFilter(null)
+    resetFilters()
+    setBackToEvents(false)
     setShowMap(false)
     setOpenEventId(null)
-    setNextWeekend(false)
     window.scrollTo(0, 0)
   }
 
@@ -383,7 +411,8 @@ export default function App() {
     if (searchDetectedPill && activePill && !matchesPill(ev, activePill)) return false
     if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
 
-    if (city && (ev.city || '') !== city) return false
+    // On Events, chain-store listings ("Bay Area") show under every city.
+    if (city && (ev.city || '') !== city && !(isEventsPage && WIDE_CITIES.includes(ev.city))) return false
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
     if (nextWeekend && ev.startDate && !isNextWeekend(ev.startDate)) return false
     // NEW: Month filter based on selectedMonthFilter
@@ -716,7 +745,8 @@ const filtered = base.filter((ev) => {
       .filter((ev) => (activePill ? matchesPill(ev, activePill) : true))
       .filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
       .map((ev) => ev.city)
-      .filter(Boolean),
+      .filter(Boolean)
+      .filter((c) => !(isEventsPage && WIDE_CITIES.includes(c))),
   )].sort()
 
   // Big swipe cards are the editor picks (the existing `featured` flag).
@@ -727,19 +757,25 @@ const filtered = base.filter((ev) => {
 
   const openSheet = (ev, play = false) => { trackEventClickThrough(ev.title, play ? 'watch_video' : 'expand'); setSheetAutoPlay(!!play); setOpenEventId(ev.id) }
 
-  // Events gets date chips instead of amenity pills.
-  const dateChips = showDateChips ? [
-    { key: 'wk', label: 'This weekend', on: weekend, run: () => { setWeekend((v) => !v); setNextWeekend(false); setSelectedMonthFilter(null); trackFilterApplied('weekend', !weekend ? 'enabled' : 'disabled') } },
-    { key: 'nwk', label: 'Next weekend', on: nextWeekend, run: () => { setNextWeekend((v) => !v); setWeekend(false); setSelectedMonthFilter(null) } },
-    ...monthFilters.map((m) => ({
-      key: m.key, label: `All ${m.label}`, on: selectedMonthFilter === m.key,
-      run: () => { setSelectedMonthFilter(selectedMonthFilter === m.key ? null : m.key); setWeekend(false); setNextWeekend(false) },
-    })),
-    { key: 'free', label: 'Free', on: freeOnly, run: toggleFreeOnly },
-  ] : []
+  // "Clear all": first pill whenever at least one filter is on. Clears Near too.
+  const activeFilterCount = [freeOnly, !!city, !!region, weekend, nextWeekend, !!selectedMonthFilter, !!dayPick]
+    .filter(Boolean).length + amenities.length
+  const clearAll = () => { resetFilters(); trackFilterApplied('clear_all', 'enabled') }
+
+  // ---- Events page view model ------------------------------------------------
+  const eventsListMode = isEventsPage && (!!dayPick || !!city)
+  const dayList = isEventsPage && dayPick ? upcoming.filter((ev) => onDay(ev, dayPick)) : []
+  const listForEvents = dayPick ? dayList : upcoming
+  const groupNames = Object.fromEntries(Object.keys(GROUPS).map((k) => [k, groupName(k, events)]))
+  const mosaicGroups = isEventsPage && !eventsListMode
+    ? Object.fromEntries(Object.keys(GROUPS).map((k) => [k, { name: groupNames[k], list: collapseSeries(upcoming.filter((ev) => groupsOf(ev).includes(k))) }]))
+    : {}
+  const specials = isEventsPage ? upcoming.filter((ev) => ev.dontMiss).sort((a, b) => (a.startDate || '').localeCompare(b.startDate || '')) : []
+  const seasons = isEventsPage ? seasonPagesNow(countFor).map((s) => ({ s, count: countFor(s.pill) })) : []
+  const openSeasonPage = (label) => choosePill(label, { fromEvents: true })
 
   const pageSubtitle = loading ? 'Loading...' : (() => {
-    const t = countLabel(pill, upcoming.length)
+    const t = countLabel(pill, isEventsPage && dayPick ? dayList.length : upcoming.length)
     return t.charAt(0).toUpperCase() + t.slice(1) + (city ? ` in ${city}` : '')
   })()
 
@@ -772,28 +808,38 @@ const filtered = base.filter((ev) => {
           {/* Filter pills + page title stay pinned under the header while scrolling. */}
           <div className="nx-stick">
           {/* Filter pills: the page's own amenity list, or date chips on Events. */}
-          {showAmenities && amenityOptions.length > 0 && (
+          {!isEventsPage && (activeFilterCount > 0 || (showAmenities && amenityOptions.length > 0)) && (
             <div className="nx-subpills">
-              {amenityOptions.map((name) => {
+              {activeFilterCount > 0 && (
+                <button className="nx-sub clear" onClick={clearAll}>✕ Clear all</button>
+              )}
+              {showAmenities && amenityOptions.map((name) => {
                 const on = amenities.includes(name)
                 return (
                   <button key={name} className={`nx-sub${on ? ' on' : ''}`} onClick={() => toggleAmenity(name)}>
-                    {getAmenityLabel(name)}
+                    {getAmenityLabel(name, pill)}
                   </button>
                 )
               })}
             </div>
           )}
-          {dateChips.length > 0 && (
-            <div className="nx-subpills">
-              {dateChips.map((c) => (
-                <button key={c.key} className={`nx-sub${c.on ? ' on' : ''}`} onClick={c.run}>{c.label}</button>
-              ))}
-            </div>
+          {isEventsPage && (
+            <DayRibbon
+              pick={dayPick}
+              onPick={(d) => { setDayPick(d); setOpenGroup(null); if (d) trackFilterApplied('day', d) }}
+              hasEvents={(d) => upcoming.some((ev) => onDay(ev, d))}
+              lead={(
+                <>
+                  {activeFilterCount > 0 && <button className="nx-sub clear nx-rbpill" onClick={clearAll}>✕ Clear all</button>}
+                  <button className={`nx-sub nx-rbpill${freeOnly ? ' on' : ''}`} onClick={toggleFreeOnly}>{getAmenityLabel('free')}</button>
+                </>
+              )}
+            />
           )}
 
           <PageHead
-            title={pill || 'Search results'}
+            onBack={backToEvents && (pill === 'Halloween' || pill === 'Pumpkin Patches') ? () => choosePill('Events') : null}
+            title={isEventsPage && dayPick ? dayTitle(dayPick) : (pill || 'Search results')}
             subtitle={pageSubtitle}
             showMap={!loading && mappable.length > 0}
             mapOn={showMap}
@@ -833,6 +879,67 @@ const filtered = base.filter((ev) => {
             </div>
           ) : loading ? (
             <div className="nx-section"><div className="nx-list">{[1, 2, 3, 4].map((i) => <div key={i} style={{ padding: 12 }}><EventCardSkeleton /></div>)}</div></div>
+          ) : isEventsPage ? (
+            eventsListMode ? (
+              // A picked day, or a Near city: one plain list, each card with its group chip.
+              <div className="nx-section">
+                <div className="nx-list">
+                  {listForEvents.map((ev) => (
+                    <CompactRow theme={theme} page={pill} key={ev.id} ev={ev} canExpand expanded={false}
+                      extraChips={groupChips(ev, groupNames)}
+                      onToggle={openSheet} onOfficial={openOfficial} onDirections={openDirections} onShare={shareEvent}
+                      onCalendar={addToCalendar} hidePrice={hidePrice || hidesPriceForEvent(ev)} />
+                  ))}
+                </div>
+                {listForEvents.length === 0 && !error && (
+                  <div style={{ textAlign: 'center', padding: '40px 24px' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 6 }}>No events found</div>
+                    <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7 }}>Try another day, or tap Clear all.</div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {(featured.length > 0 || seasons.length > 0) && (
+                  <>
+                    <h2 className="nx-secth">Top picks</h2>
+                    <div className="nx-bigrow">
+                      {featured.map((ev) => (
+                        <FeatureCard theme={theme} key={ev.id} ev={ev} page={pill}
+                          onLearnMore={openSheet} onOfficial={openOfficial} onDirections={openDirections} onShare={shareEvent}
+                          hidePrice={hidePrice || hidesPriceForEvent(ev)} />
+                      ))}
+                      {seasons.map(({ s, count }) => (
+                        <SeasonCard key={s.pill} s={s} count={count} onOpen={() => openSeasonPage(s.pill)} />
+                      ))}
+                    </div>
+                  </>
+                )}
+                <h2 className="nx-secth">Browse by interest</h2>
+                <Mosaic
+                  groups={mosaicGroups}
+                  seasons={seasons}
+                  specials={specials}
+                  openKey={openGroup}
+                  onGroup={(k) => { setOpenGroup((cur) => (cur === k ? null : k)); trackFilterApplied('event_group', k) }}
+                  onSeason={openSeasonPage}
+                  onSpecial={(ev) => openSheet(ev)}
+                />
+                {openGroup && mosaicGroups[openGroup] && (
+                  <div className="nx-glist" ref={groupListRef}>
+                    <h3 style={{ color: GROUPS[openGroup].c2 }}>{mosaicGroups[openGroup].name}</h3>
+                    <div className="nx-list">
+                      {mosaicGroups[openGroup].list.map((ev) => (
+                        <CompactRow theme={theme} page={pill} key={ev.id} ev={ev} canExpand expanded={false}
+                          onToggle={openSheet} onOfficial={openOfficial} onDirections={openDirections} onShare={shareEvent}
+                          onCalendar={addToCalendar} hidePrice={hidePrice || hidesPriceForEvent(ev)} />
+                      ))}
+                    </div>
+                    <button className="nx-less" onClick={() => { setOpenGroup(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Close ▲</button>
+                  </div>
+                )}
+              </>
+            )
           ) : (
             <>
               {featured.length > 0 && (

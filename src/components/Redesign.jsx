@@ -12,17 +12,21 @@ import { themeFor } from '../constants.js'
 // Reservation required, Dog friendly...). Never invent synonyms.
 // ---------------------------------------------------------------------------
 
+// The Halloween image everywhere (circle, home tiles, Events page tiles). It is
+// the Nightfall at Filoli photo; the listing itself stays as it is.
+export const HALLOWEEN_PHOTO = '/media/halloween/filoli.jpg'
+
 // The categories shown as circles. Zoo & Aquarium, Museum and Beaches are left
 // out on purpose for now; their pages still work from Home and old links.
 // `photo` is used when set, otherwise the gradient + icon stands in.
 export const CATEGORY_CIRCLES = [
-  { pill: 'Playground', photo: '/placeholders/playground/playground-02.jpg', bg: 'linear-gradient(150deg,#9ac27d,#4f7d3a)' },
-  { pill: 'Events', photo: '', bg: 'linear-gradient(150deg,#2f8a63,#12583a)' },
+  { pill: 'Playground', photo: '/media/home/playgrounds-sm.jpg', bg: 'linear-gradient(150deg,#9ac27d,#4f7d3a)' },
+  { pill: 'Events', photo: '/media/home/events-sm.jpg', bg: 'linear-gradient(150deg,#2f8a63,#12583a)' },
   { pill: 'Pumpkin Patches', photo: '/media/pumpkin.jpg', bg: 'linear-gradient(150deg,#e8a15a,#b8561f)' },
-  { pill: 'Halloween', photo: '/media/halloween/light-tunnel.jpg', bg: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
+  { pill: 'Halloween', photo: HALLOWEEN_PHOTO, bg: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
   { pill: 'Fruit Picking', photo: '/media/apple.jpg', bg: 'linear-gradient(150deg,#8fb56a,#4a7a2e)' },
-  { pill: 'Holiday Events', photo: '', bg: 'linear-gradient(150deg,#c0504d,#7a2320)' },
-  { pill: 'Boat Rides', photo: '', bg: 'linear-gradient(150deg,#5c86ab,#1f3a6b)' },
+  { pill: 'Holiday Events', photo: '/media/home/holiday-events-sm.jpg', bg: 'linear-gradient(150deg,#c0504d,#7a2320)' },
+  { pill: 'Boat Rides', photo: '/media/home/boat-rides-sm.jpg', bg: 'linear-gradient(150deg,#5c86ab,#1f3a6b)' },
 ]
 
 const CAT_ICON = {
@@ -123,10 +127,13 @@ function freeLabel(ev, page) {
 function PhotoBadges({ ev, hidePrice, theme, page, extraTop, extraBottom }) {
   // Playgrounds never get it: nearly all are free, so it says nothing.
   const showFree = !hidePrice && ev.free && ev.category !== 'Playground'
+  // Playgrounds only: set by SQL (newly_opened), stays until it is removed.
+  const showNew = ev.category === 'Playground' && ev.newlyOpened
   return (
     <>
       <div className="nx-ptop">
         {extraTop}
+        {showNew && <span className="nx-ob" style={{ background: '#1A6B4A', color: '#fff', fontWeight: 800 }}>Newly opened</span>}
         {showFree && (
           <span className="nx-ob" style={{ background: '#1A6B4A', color: '#fff', fontWeight: 800 }}>{freeLabel(ev, page)}</span>
         )}
@@ -140,8 +147,8 @@ function PhotoBadges({ ev, hidePrice, theme, page, extraTop, extraBottom }) {
 }
 
 // Ages + Reservation required (events and everything else).
-function EventChips({ ev }) {
-  const chips = []
+function EventChips({ ev, extra = [] }) {
+  const chips = [...extra]
   if (ev.ages && ev.ages.trim().toLowerCase() !== 'all ages') chips.push(['ages', `Ages ${ev.ages}`, '#E8F5EE', '#1A6B4A'])
   if (ev.needsReservation) chips.push(['res', '🎟 Reservation required', '#FEF0E6', '#C94F2C'])
   return <ChipRow chips={chips} />
@@ -186,7 +193,7 @@ function statusLine(ev) {
 //   Playground: name, city, amenity chips (right after the city).
 //   Everything else: name, Ages / Reservation chips (right after the name),
 //   city, date.
-function CardText({ ev, hidePrice, onShare, Title }) {
+function CardText({ ev, hidePrice, onShare, Title, extraChips }) {
   // Cards show only opening to closing date ("SEP 26 – NOV 1"). The detailed
   // schedule ("Fri to Sun, through Nov 1") and times live in the sheet.
   const range = openCloseLabel(ev)
@@ -204,7 +211,7 @@ function CardText({ ev, hidePrice, onShare, Title }) {
         <>{meta}<AmenityChips ev={ev} />{status && <div className={`nx-status ${status.cls}`}>{status.text}</div>}</>
       ) : (
         <>
-          <EventChips ev={ev} />
+          <EventChips ev={ev} extra={extraChips} />
           {meta}
           {range && <div className="nx-when">{range}</div>}
           {status && <div className={`nx-status ${status.cls}`}>{status.text}</div>}
@@ -267,7 +274,7 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
 }
 
 // ---- Listing card (Amazon style) -----------------------------------------
-export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hidePrice, page, theme = themeFor(null) }) {
+export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hidePrice, page, theme = themeFor(null), extraChips }) {
   const pg = isPlayground(ev)
   const open = () => (pg ? (hasOfficial(ev) ? onOfficial(ev) : onDirections(ev)) : onToggle(ev, false))
   const H4 = ({ children }) => <h4>{children}</h4>
@@ -279,7 +286,7 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
         {ev.videoUrl && <PlayBadge right onClick={() => onToggle(ev, true)} />}
       </div>
       <div className="nx-smallbody">
-        <CardText ev={ev} hidePrice={hidePrice} onShare={onShare} Title={H4} />
+        <CardText ev={ev} hidePrice={hidePrice} onShare={onShare} Title={H4} extraChips={extraChips} />
         <div className="nx-actions">
           {pg ? (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onDirections(ev) }}>📍 Directions</button>
@@ -293,10 +300,11 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
 }
 
 // ---- Page head ------------------------------------------------------------
-export function PageHead({ title, subtitle, showMap, mapOn, onMap, onShare }) {
+export function PageHead({ title, subtitle, showMap, mapOn, onMap, onShare, onBack }) {
   return (
     <div className="nx-head">
-      <div style={{ minWidth: 0 }}>
+      {onBack && <button className="nx-back" onClick={onBack} aria-label="Back to Events">‹ Events</button>}
+      <div style={{ minWidth: 0, flex: 1 }}>
         <h1>{title}</h1>
         {subtitle && <p>{subtitle}</p>}
       </div>

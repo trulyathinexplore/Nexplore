@@ -49,7 +49,9 @@ export const PILLS = [
     // same house in both seasons: 697 Sonoma Ave in Livermore is Christmas on
     // Sonoma in December and Frightmare in October. One tag means tagging a
     // house once, and it means the label map only has to carry one word for it.
-    fixedAmenities: ['no-spooks', 'free', 'family-friendly', 'haunted-maze', 'home-display'],
+    // 'train-ride' is the Holiday Events tag, reused. Here it reads
+    // "Halloween train rides" (see PAGE_AMENITY_LABELS below).
+    fixedAmenities: ['no-spooks', 'free', 'family-friendly', 'haunted-maze', 'home-display', 'train-ride'],
   },
   { label: 'Fruit Picking',  type: 'category', value: 17,
     fixedAmenities: ['apple-picking'] },
@@ -266,7 +268,7 @@ export const AMENITY_LABELS = {
   'no-spooks': '🧸 No spooks',
   'family-friendly': '👪 Family friendly',
   'haunted-maze': '🕸 Haunted maze',
-  'home-display': '🏠 Home display',
+  'home-display': '🏠 Yard displays',
   'drive-through': '🚙 Drive through',
   'santa-photos': '🎅 Santa photos',
   'train-ride': '🚂 Trains',
@@ -274,6 +276,11 @@ export const AMENITY_LABELS = {
   'christmas-village': '🎄 Christmas village'
 }
  
+// The same tag can read differently on one page. Checked before AMENITY_LABELS.
+export const PAGE_AMENITY_LABELS = {
+  'Halloween': { 'train-ride': '🚂 Halloween train rides' },
+}
+
 // Extract amenities from description field (for pumpkin patches with emoji badges)
 export function extractAmenitiesFromDescription(description) {
   if (!description) return []

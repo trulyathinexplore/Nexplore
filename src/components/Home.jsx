@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FALL_COLOUR, WEEKEND_TRIPS } from '../fallLists.js'
+import { HALLOWEEN_PHOTO } from './Redesign.jsx'
 
 // The home page. Lives inside the app rather than as a standalone file like
 // public/fall.html, which is the whole reason the header is genuinely shared
@@ -32,7 +33,7 @@ import { FALL_COLOUR, WEEKEND_TRIPS } from '../fallLists.js'
 const SEASONAL = [
   { pill: 'Pumpkin Patches', name: 'Pumpkin Patches', note: 'Across the Bay', word: 'the patches', photo: '/media/pumpkin.jpg', fallback: 'linear-gradient(150deg,#dd9448,#c2612f)' },
   { pill: 'Fruit Picking', name: 'Apple Picking', note: 'Ends soon', word: 'the farms', photo: '/media/apple.jpg', fallback: 'linear-gradient(150deg,#8fb56a,#4a7c3f)' },
-  { pill: 'Halloween', name: 'Halloween', note: 'All through October', word: 'what is on', photo: '', fallback: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
+  { pill: 'Halloween', name: 'Halloween', note: 'All through October', word: 'what is on', photo: HALLOWEEN_PHOTO, fallback: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
   { sheet: 'colour', name: 'Fall color', note: 'Peaks in November', word: 'the spots', count: FALL_COLOUR.places.length, photo: '/media/spots.jpg', fallback: 'linear-gradient(150deg,#e0a05c,#a8552c)' },
   { sheet: 'trips', name: 'Weekend Trips', note: 'Best in October', word: 'the trips', count: WEEKEND_TRIPS.places.length, photo: '/media/trips.jpg', fallback: 'linear-gradient(150deg,#8fa8bd,#4a6377)' },
 ]
@@ -49,13 +50,15 @@ const countCta = (n, word) => (n > 0 ? `See all ${n}` : `See ${word}`)
 //
 // Halloween is in both, knowingly: the fall guide tile is the seasonal landing
 // and this one is the events list. It is the only remaining repeat on the page.
+// Oct 2026: Events runs full width on top, then a 2x2 of Playgrounds,
+// Halloween, Boat Rides and Holiday Events. Museums and Beaches & Tidepools
+// left this grid; their pages and links still work.
 const TILES = [
-  { pill: 'Events', name: 'Events', cta: () => "What's on this month", photo: '', fallback: 'linear-gradient(150deg,#2f8a63 0%,#12583a 100%)' },
-  { pill: 'Playground', name: 'Playgrounds', cta: (n) => (n > 0 ? `All ${n}, find one near you` : 'Find one near you'), photo: '', fallback: 'linear-gradient(150deg,#b89ccc 0%,#6f4f8f 100%)' },
-  { pill: 'Halloween', name: 'Halloween events', cta: (n) => countCta(n, 'what is on'), photo: '', fallback: 'linear-gradient(150deg,#8b7ab8 0%,#4b3d70 100%)' },
-  { pill: 'Boat Rides', name: 'Boat Rides', cta: () => 'Out on the water', photo: '', fallback: 'linear-gradient(150deg,#5c86ab 0%,#1f3a6b 100%)' },
-  { pill: 'Museum', name: 'Museums', cta: () => 'Rainy day list', photo: '', fallback: 'linear-gradient(150deg,#e0a3ae 0%,#a8556a 100%)' },
-  { pill: 'Beaches', name: 'Beaches & Tidepools', cta: () => 'See the coast', photo: '', fallback: 'linear-gradient(150deg,#7fb3d4 0%,#3d6f96 100%)' },
+  { pill: 'Events', name: 'Events', wide: true, cta: () => "What's on this month", photo: '/media/home/events.jpg', fallback: 'linear-gradient(150deg,#2f8a63 0%,#12583a 100%)' },
+  { pill: 'Playground', name: 'Playgrounds', cta: (n) => (n > 0 ? `All ${n}, find one near you` : 'Find one near you'), photo: '/media/home/playgrounds.jpg', fallback: 'linear-gradient(150deg,#b89ccc 0%,#6f4f8f 100%)' },
+  { pill: 'Halloween', name: 'Halloween events', cta: (n) => countCta(n, 'what is on'), photo: HALLOWEEN_PHOTO, fallback: 'linear-gradient(150deg,#8b7ab8 0%,#4b3d70 100%)' },
+  { pill: 'Boat Rides', name: 'Boat Rides', cta: () => 'Out on the water', photo: '/media/home/boat-rides.jpg', fallback: 'linear-gradient(150deg,#5c86ab 0%,#1f3a6b 100%)' },
+  { pill: 'Holiday Events', name: 'Holiday Events', cta: (n) => countCta(n, 'what is on'), photo: '/media/home/holiday-events.jpg', fallback: 'linear-gradient(150deg,#c0504d 0%,#7a2320 100%)' },
 ]
 
 const bgFor = (t) => (t.photo ? `url('${t.photo}') center / cover` : t.fallback)
@@ -223,7 +226,7 @@ export default function Home({ countFor, onPick }) {
             <div
               key={t.name}
               onClick={() => onPick(t.pill)}
-              style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', height: 142, cursor: 'pointer', boxShadow: '0 1px 2px rgba(32,26,18,0.06), 0 5px 14px rgba(32,26,18,0.10)' }}
+              style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', height: t.wide ? 168 : 142, gridColumn: t.wide ? '1 / -1' : undefined, cursor: 'pointer', boxShadow: '0 1px 2px rgba(32,26,18,0.06), 0 5px 14px rgba(32,26,18,0.10)' }}
             >
               <div style={{ position: 'absolute', inset: 0, background: bgFor(t) }} />
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 32%, rgba(26,15,8,0.74) 100%)' }} />

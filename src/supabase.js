@@ -22,7 +22,7 @@ function demoVideo(e) {
 
 // Embed category name + tags + venue (for city/address) so pills/amenities can filter on them.
 export async function fetchEvents({ freeOnly = false } = {}) {
-const select = '*,categories(name),event_tags(tags(name,tag_group)),venues(name,address,city,state,latitude,longitude)'
+const select = '*,categories(name),event_tags(tags(*)),venues(name,address,city,state,latitude,longitude)'
    let url = `${SUPABASE_URL}/rest/v1/events?select=${encodeURIComponent(select)}&status=eq.published&order=start_date.asc`
   if (freeOnly) url += '&is_free=eq.true'
   const res = await fetch(url, { headers })
@@ -130,6 +130,10 @@ export function mapEvent(e) {
     eventType: e.event_type || e.content_type || 'event',
     contentType: e.content_type || '',
     seriesName: e.series_name || '',
+    // Oct 2026 release. Both columns are added by the release SQL; until it
+    // runs they are simply undefined, so nothing breaks.
+    dontMiss: e.dont_miss === true,
+    newlyOpened: e.newly_opened === true,
     seasonalType: e.seasonal_type || null,
     categoryId: e.category_id || null,
     category: e.categories?.name || null,
@@ -172,6 +176,8 @@ export function mapBeach(beach) {
     eventType: beach.eventType || 'beach',
     contentType: '',
     seriesName: '',
+    dontMiss: false,
+    newlyOpened: false,
     seasonalType: null,
     categoryId: null, // beaches have no Supabase category row
     category: beach.category || 'Beach',
