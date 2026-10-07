@@ -1,0 +1,275 @@
+ 
+import { BEACHES } from './beachData.js'
+import { EVENT_COORDS } from './eventCoords.js'
+ 
+const SUPABASE_URL = 'https://kgythyenzjmnrzrlxynj.supabase.co'
+const SUPABASE_ANON =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtneXRoeWVuemptbnJ6cmx4eW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzOTY0MzUsImV4cCI6MjA5NDk3MjQzNX0.6qtAjUDmVlOUOTbbfr-YTU3AtsJ172lnBaIL9XlJ-Ys'
+const headers = {
+  apikey: SUPABASE_ANON,
+  Authorization: `Bearer ${SUPABASE_ANON}`,
+  'Content-Type': 'application/json',
+}
+ 
+// PREVIEW ONLY: until real reels are uploaded, the preview site shows a
+// sample clip on editor picks and a few listings so the Watch flow can be
+// tried. Never runs on nexplore.us.
+const DEMO_VIDEO = typeof window !== 'undefined' && /preview|localhost|^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname)
+function demoVideo(e) {
+  if (!DEMO_VIDEO) return null
+  return /spina/i.test(e.title || '') || e.featured || e.is_editor_pick || Number(e.id) % 3 === 0 ? '/media/sample-reel.mp4' : null
+}
+
+// Embed category name + tags + venue (for city/address) so pills/amenities can filter on them.
+export async function fetchEvents({ freeOnly = false } = {}) {
+const select = '*,categories(name),event_tags(tags(*)),venues(name,address,city,state,latitude,longitude)'
+   let url = `${SUPABASE_URL}/rest/v1/events?select=${encodeURIComponent(select)}&status=eq.published&order=start_date.asc,id.asc`
+  if (freeOnly) url += '&is_free=eq.true'
+  // Supabase returns at most 1000 rows per request. Past 1000 published rows
+  // (1226 after the Oct 2026 release) the rest were silently dropped, and since
+  // undated rows sort last, whole categories like Indoor Play vanished. So read
+  // in pages of 1000 until a short page comes back. `id` breaks start_date ties
+  // so a row can never fall between two pages.
+  // The first page also asks for the total, so the remaining pages load in
+  // parallel instead of one after another.
+  const PAGE = 1000
+  const getPage = async (from, withCount) => {
+    const res = await fetch(url, {
+      headers: { ...headers, Range: `${from}-${from + PAGE - 1}`, 'Range-Unit': 'items', ...(withCount ? { Prefer: 'count=exact' } : {}) },
+    })
+    if (!res.ok) throw new Error(`Supabase error: ${res.status}`)
+    const total = Number((res.headers.get('content-range') || '').split('/')[1])
+    return { rows: await res.json(), total }
+  }
+  const first = await getPage(0, true)
+  const events = [...first.rows]
+  if (first.rows.length === PAGE) {
+    const total = Number.isFinite(first.total) && first.total > PAGE ? Math.min(first.total, 20000) : 2 * PAGE
+    const starts = []
+    for (let from = PAGE; from < total; from += PAGE) starts.push(from)
+    const pages = await Promise.all(starts.map((from) => getPage(from, false)))
+    pages.forEach((pg) => events.push(...pg.rows))
+  }
+ 
+  // Merge with local beach data
+  const mappedBeaches = BEACHES.map(mapBeach)
+  const filtered = freeOnly ? mappedBeaches.filter(b => b.free) : mappedBeaches
+ 
+  return [...events, ...filtered]
+}
+ 
+// Supabase returns numeric columns as numbers, but a hand-edited row can carry
+// a string, and Number('') is 0 — which would drop a pin in the Atlantic.
+function numOrNull(v) {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+export function mapEvent(e) {
+  // Beaches arrive already in app shape (see mapBeach) — passing them through
+  // mapEvent a second time would strip category/tags, so short-circuit here.
+  if (e && e.__isBeach) return e
+ 
+  // Prefer venue city over event-level city field
+  const venueCity = e.venues?.city || ''
+  const venueAddress = e.venues?.address || ''
+  const venueState = e.venues?.state || ''
+  const city = venueCity || e.city || ''
+ 
+  // Full address for Google Maps directions. Falling straight through to the
+  // bare city sent "Directions" to a town centre rather than the venue, so the
+  // event's own address column and eventCoords.js are both tried first.
+  const coords = EVENT_COORDS[e.id]
+  const fullAddress =
+    (venueAddress && venueCity && `${venueAddress}, ${venueCity}, ${venueState || 'CA'}`) ||
+    (e.address && e.address.trim() && /\d/.test(e.address)
+      ? `${e.address}${city ? `, ${city}` : ''}, CA`
+      : null) ||
+    coords?.address ||
+    city ||
+    'Bay Area, CA'
+ 
+  // Coordinates for the map. A linked venue wins, because that's editable in
+  // the admin tool; eventCoords.js is the fallback for rows that have no venue
+  // yet. Once every patch has a venue row, the fallback can simply be deleted.
+  // Precedence: linked venue, then the event's own columns, then the static
+  // file. The file is the legacy path — once every row carries coordinates in
+  // the database, eventCoords.js and its two imports here can be deleted.
+  const lat = numOrNull(e.venues?.latitude) ?? numOrNull(e.latitude) ?? numOrNull(coords?.lat) ?? null
+  const lng = numOrNull(e.venues?.longitude) ?? numOrNull(e.longitude) ?? numOrNull(coords?.lng) ?? null
+
+  // A street-level address, or null. Distinct from fullAddress, which falls
+  // back to a bare city so the Directions button always has something to send.
+  // resolveCoords() needs to know the difference: geocoding "Half Moon Bay"
+  // would pin four different farms to the same spot.
+  const eventStreet = e.address && /\d/.test(e.address) ? e.address.trim() : null
+  const addressLine =
+    (venueAddress && venueCity && `${venueAddress}, ${venueCity}`) ||
+    (eventStreet && `${eventStreet}${city ? `, ${city}` : ''}`) ||
+    coords?.address ||
+    null
+
+  let dayLabel = e.day_label || ''
+  if (!dayLabel && e.start_date) {
+    dayLabel = new Date(e.start_date + 'T12:00:00')
+      .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      .toUpperCase()
+  }
+ 
+  return {
+    id: e.id,
+    title: e.title,
+    description: e.description || '',
+    imageUrl: e.image_url || null,
+    videoUrl: e.video_url || demoVideo(e),
+    officialUrl: e.official_url || e.website_url || e.registration_url || '#',
+    free: e.is_free || e.price_type === 'free' || false,
+    price: e.price_label || (e.price_amount ? `$${e.price_amount}` : null),
+    // No default. An empty string means "no age chip" (same as mapBeach).
+    // "All ages" carries no information and rendered literally as
+    // "Ages All ages" on every row that had no age_range set.
+    ages: e.age_range || e.ages || '',
+    needsReservation: e.registration_required || false,
+    // Seasonal window, as MM-DD strings. Both null means year-round, which is
+    // every row that predates this, so nothing changes until they are set.
+    // See season.js for how they are read. Stored without a year because a
+    // season recurs: a full date would need editing every January.
+    seasonStart: e.season_start || null,
+    seasonEnd: e.season_end || null,
+    city,
+    fullAddress,
+    addressLine,
+    lat,
+    lng,
+    area: e.area || city || 'Bay Area',
+    startDate: e.start_date,
+    endDate: e.end_date,
+    dayLabel,
+    dayLabelRaw: e.day_label || null,
+    timeLabel: e.time_label || '',
+    isEditorPick: e.is_editor_pick || e.featured || false,
+    eventType: e.event_type || e.content_type || 'event',
+    contentType: e.content_type || '',
+    seriesName: e.series_name || '',
+    // Oct 2026 release. Both columns are added by the release SQL; until it
+    // runs they are simply undefined, so nothing breaks.
+    dontMiss: e.dont_miss === true,
+    newlyOpened: e.newly_opened === true,
+    seasonalType: e.seasonal_type || null,
+    categoryId: e.category_id || null,
+    category: e.categories?.name || null,
+    tags: (e.event_tags || []).map((et) => et.tags).filter(Boolean),
+    // Detail sheet fields (Oct 2026 release SQL adds hours_text, highlights,
+    // top_pick_rank; price_tiers and parking_info already existed).
+    hoursText: e.hours_text || '',
+    highlights: Array.isArray(e.highlights) ? e.highlights.filter(Boolean) : [],
+    priceTiers: Array.isArray(e.price_tiers) ? e.price_tiers.filter((t) => t && t.label) : [],
+    parkingInfo: e.parking_info || '',
+    topPickRank: Number.isFinite(e.top_pick_rank) ? e.top_pick_rank : null,
+    indoorOutdoor: e.indoor_outdoor || '',
+  }
+}
+ 
+// Map beach data to event format
+export function mapBeach(beach) {
+  return {
+    __isBeach: true,
+    id: beach.id,
+    title: beach.title,
+    description: beach.description || '',
+    imageUrl: beach.image || null,
+    officialUrl: beach.officialUrl || '#',
+    free: beach.free || false,
+    price: beach.free ? null : 'Day-use fee',
+    ages: '', // beaches show no age chip
+    needsReservation: false,
+    // Same shape as mapEvent, per the codebase notes: a key present in one and
+    // absent in the other becomes undefined on half the array. Beaches are
+    // year-round, so both are null and seasonState() says nothing about them.
+    seasonStart: null,
+    seasonEnd: null,
+    city: beach.city,
+    fullAddress: beach.fullAddress,
+    addressLine: beach.fullAddress || null,
+    // Shape parity with mapEvent — a key present in one and absent in the other
+    // becomes undefined on half the array and breaks filters downstream.
+    lat: numOrNull(beach.lat),
+    lng: numOrNull(beach.lng),
+    area: beach.city || 'Bay Area',
+    startDate: null,
+    endDate: null,
+    dayLabel: '',
+    dayLabelRaw: null,
+    timeLabel: '',
+    isEditorPick: beach.isEditorPick || false,
+    eventType: beach.eventType || 'beach',
+    contentType: '',
+    seriesName: '',
+    dontMiss: false,
+    newlyOpened: false,
+    seasonalType: null,
+    categoryId: null, // beaches have no Supabase category row
+    category: beach.category || 'Beach',
+    tags: beach.tags || [],
+    hoursText: '',
+    highlights: [],
+    priceTiers: [],
+    parkingInfo: '',
+    topPickRank: null,
+    indoorOutdoor: 'outdoor',
+  }
+}
+ 
+// Coordinates for an event that has a street address but no lat/lng yet.
+//
+// Look it up once, write it straight back to
+// Supabase, and never look it up again. So an address typed into the admin tool
+// turns into a pin by itself, and the row is only ever geocoded one time in its
+// life no matter how many people view it.
+//
+// Nominatim is free and needs no key, but it is donation-funded and its usage
+// policy asks for at most one request a second and no bulk work. Hence the
+// budget below and the delay in the caller. If Nexplore ever needs to geocode
+// in volume, move to a keyed service (Google, MapTiler, LocationIQ) by swapping
+// the fetch in this one function.
+const BAY = { latMin: 36.9, latMax: 39.0, lngMin: -123.5, lngMax: -121.2 }
+const coordCache = {}
+let geocodeBudget = 6 // per page load, deliberately small
+
+export async function resolveCoords(addressLine, id) {
+  if (!addressLine || geocodeBudget <= 0) return null
+  if (coordCache[addressLine] !== undefined) return coordCache[addressLine]
+  geocodeBudget -= 1
+  try {
+    const url =
+      'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' +
+      encodeURIComponent(`${addressLine}, CA, USA`)
+    const j = await (await fetch(url)).json()
+    const hit = j && j[0]
+    if (!hit) { coordCache[addressLine] = null; return null }
+
+    const lat = Number(hit.lat)
+    const lng = Number(hit.lon)
+    // Refuse anything outside the Bay Area rather than drop a pin in the wrong
+    // state. A geocoder handed a partial address will happily return the
+    // geographic centre of the country.
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+        lat < BAY.latMin || lat > BAY.latMax || lng < BAY.lngMin || lng > BAY.lngMax) {
+      coordCache[addressLine] = null
+      return null
+    }
+
+    const pair = { lat, lng }
+    coordCache[addressLine] = pair
+    fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify({ latitude: lat, longitude: lng }),
+    }).catch(() => {})
+    return pair
+  } catch {
+    coordCache[addressLine] = null
+    return null
+  }
+}
