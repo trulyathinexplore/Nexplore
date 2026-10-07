@@ -164,3 +164,42 @@ button{cursor:pointer;border:none;background:none}
 .nx-glist h3{margin:0 0 10px;font-size:17px;font-weight:800}
 .nx-less{display:block;width:100%;margin-top:2px;border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:700;padding:8px;cursor:pointer}
 .nx-sub.nx-rbpill{align-self:center}
+
+/* Card badges (Oct 2026): white outlined, two lines max, "+N" opens the sheet */
+.nx-badgewrap{position:relative;margin-top:3px}
+.nx-badges{display:flex;flex-wrap:wrap;gap:3px;max-height:42px;overflow:hidden}
+.nx-badges-measure{position:absolute;left:0;right:0;top:0;visibility:hidden;pointer-events:none;max-height:none;overflow:visible}
+.nx-badge{font-size:9.5px;font-weight:600;line-height:14px;padding:2px 6px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--charcoal);white-space:nowrap;font-family:inherit}
+.nx-badge.more{cursor:pointer;color:var(--green);border-color:var(--green)}
+
+/* Detail sheet (Oct 2026 redesign) */
+.nx-sheetbody{padding:14px 18px 0;display:flex;flex-direction:column;gap:10px}
+.nx-sheettitle{font-family:'Playfair Display',Georgia,serif;font-size:20px;font-weight:700;color:var(--charcoal);line-height:1.25}
+.nx-sbadges{display:flex;gap:5px;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -18px;padding:0 18px;scrollbar-width:none}
+.nx-sbadges::-webkit-scrollbar{display:none}
+.nx-sbadges .nx-badge{flex:none;font-size:11px;padding:3px 9px}
+.nx-snote{align-self:flex-start;background:#F2EFEA;color:#7a746d;font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px}
+.nx-snote.soon{background:#FEF0E6;color:#C94F2C}
+.nx-facts{display:flex;flex-direction:column;padding:2px 12px;background:var(--sand);border-radius:12px}
+.nx-frow{border-top:1px solid var(--border)}
+.nx-frow:first-child{border-top:none}
+div.nx-frow,.nx-frow>summary{display:grid;grid-template-columns:84px minmax(0,1fr) auto;align-items:center;gap:10px;padding:7px 0;margin:0}
+.nx-frow>summary{list-style:none;cursor:pointer;min-height:40px;padding:3px 0;-webkit-tap-highlight-color:transparent}
+.nx-frow>summary::-webkit-details-marker{display:none}
+.nx-frow>summary:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+.nx-fl{color:var(--muted);font-weight:600;font-size:12.5px;white-space:nowrap}
+.nx-fv{font-weight:600;font-size:12.5px;line-height:1.35;color:var(--charcoal);min-width:0}
+.nx-fv.g{color:var(--green)}
+.nx-fline{display:block}
+.nx-fchev{width:26px;height:26px;border-radius:50%;background:var(--sand-dark);color:var(--charcoal);display:grid;place-items:center}
+.nx-fchev svg{transition:transform .15s}
+.nx-frow[open] .nx-fchev svg{transform:rotate(180deg)}
+.nx-flist{list-style:none;margin:0 0 8px;padding:8px 10px;background:#fff;border-radius:10px;font-size:12.5px;display:flex;flex-direction:column;gap:4px;color:#5C5C56}
+.nx-flist li{display:grid;grid-template-columns:1fr auto;gap:10px}
+.nx-flist li span:last-child{white-space:nowrap;text-align:right}
+.nx-slbl{margin:2px 0 0;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.nx-shl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:1.4;color:var(--charcoal)}
+.nx-shl li{display:grid;grid-template-columns:22px 1fr;gap:6px}
+.nx-sbody-text{font-size:13px;color:#5C5C56;line-height:1.6;white-space:pre-line}
+.nx-sdisc{margin:0;font-size:11.5px;line-height:1.45;color:var(--muted);font-style:italic}
+@media (prefers-reduced-motion:reduce){.nx-fchev svg{transition:none}}

@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useLayoutEffect, useRef } from 'react'
 import { EventImage, ShareGlyph, sizedImageUrl } from './ui.jsx'
 import { seasonState } from '../season.js'
-import { themeFor } from '../constants.js'
+import { themeFor, badgesFor, badgeLabel, pillForEvent } from '../constants.js'
 
 // ---------------------------------------------------------------------------
 // Explore redesign (Sep 2026). One template for every list page:
@@ -22,6 +22,7 @@ export const HALLOWEEN_PHOTO = '/media/halloween/filoli.jpg'
 export const CATEGORY_CIRCLES = [
   { pill: 'Playground', photo: '/media/home/playgrounds-sm.jpg', bg: 'linear-gradient(150deg,#9ac27d,#4f7d3a)' },
   { pill: 'Events', photo: '/media/home/events-sm.jpg', bg: 'linear-gradient(150deg,#2f8a63,#12583a)' },
+  { pill: 'Indoor Play', bg: 'linear-gradient(150deg,#f0a868,#c4622d)' },
   { pill: 'Pumpkin Patches', photo: '/media/pumpkin.jpg', bg: 'linear-gradient(150deg,#e8a15a,#b8561f)' },
   { pill: 'Halloween', photo: HALLOWEEN_PHOTO, bg: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
   { pill: 'Fruit Picking', photo: '/media/apple.jpg', bg: 'linear-gradient(150deg,#8fb56a,#4a7a2e)' },
@@ -32,6 +33,7 @@ export const CATEGORY_CIRCLES = [
 const CAT_ICON = {
   'Events': <path d="M5 7h22v20H5zM5 13h22M11 4v5M21 4v5M16 16l1.5 3 3.2.4-2.4 2.2.7 3.2-3-1.7-3 1.7.7-3.2-2.4-2.2 3.2-.4z" />,
   'Holiday Events': <path d="M16 3l-7 10h4l-6 8h6l-5 6h16l-5-6h6l-6-8h4zM16 27v3" />,
+  'Indoor Play': <path d="M4 14L16 5l12 9v13H4zM10 27v-7h12v7M13 20l-3-6h12l-3 6" />,
   'Boat Rides': <path d="M5 20h22l-3 6H8zM16 4v16M16 5l8 12h-8M3 29c3 0 3-1.5 6.5-1.5S13 29 16 29s3-1.5 6.5-1.5S26 29 29 29" />,
 }
 
@@ -114,6 +116,7 @@ const PLAYGROUND_INFO_LINE = [
   ['restrooms', '🚻 Restrooms', '#E8F5EE', '#1A6B4A'],
   ['parking-onsite', '🅿️ Lot', '#E8F5EE', '#1A6B4A'],
   ['splash-pad', '💦 Splash pad', '#E8F5EE', '#1A6B4A'],
+  ['bike-track', '🚲 Bike track', '#E8F5EE', '#1A6B4A'],
 ]
 
 // Pumpkin Patches and Fruit Picking always say FREE ADMISSION (walking in is
@@ -189,11 +192,58 @@ function statusLine(ev) {
   return null
 }
 
+// White outlined badges above Learn more (Oct 2026). Never more than two
+// lines: whatever does not fit becomes a "+N" badge, and tapping it opens the
+// detail sheet, which lists every badge. Lines are measured, not guessed,
+// because badge widths depend on the phone.
+function CardBadges({ ev, page, onMore }) {
+  const ids = badgesFor(ev, page)
+  const label = pillForEvent(ev, page)
+  const measureRef = useRef(null)
+  const [shown, setShown] = useState(ids.length)
+  const key = ids.join('|')
+  useLayoutEffect(() => {
+    const box = measureRef.current
+    if (!box) return
+    const fit = () => {
+      const kids = Array.from(box.children)
+      if (!kids.length) return
+      const tops = [...new Set(kids.map((k) => k.offsetTop))].sort((a, b) => a - b)
+      if (tops.length <= 2) { setShown(ids.length); return }
+      const second = tops[1]
+      const onTwo = kids.filter((k) => k.offsetTop <= second).length
+      // Leave room for the "+N" badge on line two.
+      setShown(Math.max(1, Math.min(ids.length, onTwo - 1)))
+    }
+    fit()
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(fit)
+      ro.observe(box)
+      return () => ro.disconnect()
+    }
+  }, [key])
+  if (!ids.length) return null
+  const hidden = ids.length - shown
+  return (
+    <div className="nx-badgewrap">
+      <div className="nx-badges nx-badges-measure" ref={measureRef} aria-hidden="true">
+        {ids.map((id) => <span key={id} className="nx-badge">{badgeLabel(id, label)}</span>)}
+      </div>
+      <div className="nx-badges">
+        {ids.slice(0, shown).map((id) => <span key={id} className="nx-badge">{badgeLabel(id, label)}</span>)}
+        {hidden > 0 && (
+          <button className="nx-badge more" onClick={(e) => { e.stopPropagation(); onMore && onMore(ev) }} aria-label={`${hidden} more`}>+{hidden}</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Text block shared by both card sizes.
 //   Playground: name, city, amenity chips (right after the city).
 //   Everything else: name, Ages / Reservation chips (right after the name),
 //   city, date.
-function CardText({ ev, hidePrice, onShare, Title, extraChips }) {
+function CardText({ ev, hidePrice, onShare, Title, extraChips, page, onMore }) {
   // Cards show only opening to closing date ("SEP 26 – NOV 1"). The detailed
   // schedule ("Fri to Sun, through Nov 1") and times live in the sheet.
   const range = openCloseLabel(ev)
@@ -215,6 +265,7 @@ function CardText({ ev, hidePrice, onShare, Title, extraChips }) {
           {meta}
           {range && <div className="nx-when">{range}</div>}
           {status && <div className={`nx-status ${status.cls}`}>{status.text}</div>}
+          <CardBadges ev={ev} page={page} onMore={onMore} />
         </>
       )}
     </>
@@ -260,7 +311,7 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
         {ev.videoUrl && <PlayBadge big onClick={() => onLearnMore(ev, true)} />}
       </div>
       <div className="nx-bigbody">
-        <CardText ev={ev} hidePrice={hidePrice} onShare={onShare} Title={H3} />
+        <CardText ev={ev} hidePrice={hidePrice} onShare={onShare} Title={H3} page={page} onMore={(x) => onLearnMore(x)} />
         <div className="nx-actions">
           {pg ? (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onDirections(ev) }}>📍 Directions</button>
@@ -286,7 +337,7 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
         {ev.videoUrl && <PlayBadge right onClick={() => onToggle(ev, true)} />}
       </div>
       <div className="nx-smallbody">
-        <CardText ev={ev} hidePrice={hidePrice} onShare={onShare} Title={H4} extraChips={extraChips} />
+        <CardText ev={ev} hidePrice={hidePrice} onShare={onShare} Title={H4} extraChips={extraChips} page={page} onMore={(x) => onToggle(x, false)} />
         <div className="nx-actions">
           {pg ? (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onDirections(ev) }}>📍 Directions</button>

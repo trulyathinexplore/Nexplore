@@ -72,6 +72,11 @@ const VIEWS = {
   'museum':          { noun: 'Museums',             query: 'category_id=eq.2' },
   // Keep these nouns in step with COUNT_WORDS in src/constants.js, so a card
   // and the link preview of the same category say the same thing.
+  // Indoor Play (Oct 2026) has no fixed category id yet, so it filters on the
+  // category name through an inner join. If that ever fails, the generic
+  // preview shows, which is the same as having no entry.
+  'indoor-play':     { noun: 'Indoor Spots',        query: 'categories.name=eq.Indoor%20Play', select: 'id,categories!inner(name)',
+    desc: 'Indoor playgrounds, free library play spaces, arcades, mini golf, trampoline parks, bowling and hands-on spots like LEGO and slime making, across the Bay Area.' },
   'boat-rides':      { noun: 'Boat Rides',          query: 'category_id=eq.18',
     desc: 'Lake rentals, ferries and bay cruises across the Bay Area. Pedal boats and kayaks, the Sausalito and Angel Island ferries, and the ones that stay open all winter.' },
 }
@@ -106,7 +111,7 @@ async function viewPreview(url, slug, isMap) {
   let count = null
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/events?${view.query}&status=eq.published&select=id`,
+      `${SUPABASE_URL}/rest/v1/events?${view.query}&status=eq.published&select=${encodeURIComponent(view.select || 'id')}`,
       { headers: { ...sbHeaders, Prefer: 'count=exact', Range: '0-0' } },
     )
     // content-range comes back as "0-0/37"; the total is what we want.

@@ -138,6 +138,14 @@ export function mapEvent(e) {
     categoryId: e.category_id || null,
     category: e.categories?.name || null,
     tags: (e.event_tags || []).map((et) => et.tags).filter(Boolean),
+    // Detail sheet fields (Oct 2026 release SQL adds hours_text, highlights,
+    // top_pick_rank; price_tiers and parking_info already existed).
+    hoursText: e.hours_text || '',
+    highlights: Array.isArray(e.highlights) ? e.highlights.filter(Boolean) : [],
+    priceTiers: Array.isArray(e.price_tiers) ? e.price_tiers.filter((t) => t && t.label) : [],
+    parkingInfo: e.parking_info || '',
+    topPickRank: Number.isFinite(e.top_pick_rank) ? e.top_pick_rank : null,
+    indoorOutdoor: e.indoor_outdoor || '',
   }
 }
  
@@ -182,6 +190,12 @@ export function mapBeach(beach) {
     categoryId: null, // beaches have no Supabase category row
     category: beach.category || 'Beach',
     tags: beach.tags || [],
+    hoursText: '',
+    highlights: [],
+    priceTiers: [],
+    parkingInfo: '',
+    topPickRank: null,
+    indoorOutdoor: 'outdoor',
   }
 }
  

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { cardBg, REGIONS, themeFor } from '../constants.js'
+import { cardBg, REGIONS, themeFor, badgesFor, badgeLabel, pillForEvent, backLabel } from '../constants.js'
 import { seasonState } from '../season.js'
 
 export function SearchIcon() {
@@ -695,30 +695,107 @@ function SheetMedia({ event, autoPlay }) {
   )
 }
 
-export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null), hidePrice = false, autoPlay = false }) {
-  if (!event) return null
 
-  // The emoji badge line at the end of a description is internal metadata that
-  // now lives in tags. Strip it so it is not shown twice.
+// ---------------------------------------------------------------------------
+// Detail sheet (Oct 2026 redesign, approved prototype v9).
+//   Title, then badges on ONE line (swipe for more), then a compact facts box:
+//   Open / When, Hours, Price (dropdown for itemised prices), Parking,
+//   Address. Then emoji highlights instead of the long paragraph, the
+//   "can change" note, Directions + Visit website, and Back to the list.
+// A row with no data is left off rather than shown empty.
+// ---------------------------------------------------------------------------
+const SHEET_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const sheetDay = (s) => new Date(s + 'T12:00:00')
+function sheetRange(event) {
+  if (event.dayLabelRaw) return event.dayLabelRaw
+  if (!event.startDate) return ''
+  const a = sheetDay(event.startDate)
+  const b = sheetDay(event.endDate || event.startDate)
+  const A = `${SHEET_MON[a.getMonth()]} ${a.getDate()}`
+  if (a.getTime() === b.getTime()) return A
+  return `${A} – ${SHEET_MON[b.getMonth()]} ${b.getDate()}`
+}
+
+// A one-off or dated event shows When (date and time). Places with opening
+// hours show Open (season dates) and Hours.
+function isDatedEvent(event) {
+  if (event.eventType === 'event') return true
+  return !!(event.startDate && event.endDate && event.startDate === event.endDate)
+}
+
+const usableTime = (t) => !!t && t.length <= 60 && !/to be announced|tba|^tbd$/i.test(t.trim())
+
+function SheetChevron() {
+  return (
+    <span className="nx-fchev" aria-hidden="true">
+      <svg viewBox="0 0 12 12" width="12" height="12"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    </span>
+  )
+}
+
+function FactRow({ label, children, green }) {
+  return (
+    <div className="nx-frow">
+      <span className="nx-fl">{label}</span>
+      <span className={`nx-fv${green ? ' g' : ''}`}>{children}</span>
+    </div>
+  )
+}
+
+function FactDropdown({ label, summary, children }) {
+  return (
+    <details className="nx-frow ex">
+      <summary>
+        <span className="nx-fl">{label}</span>
+        <span className="nx-fv">{summary}</span>
+        <SheetChevron />
+      </summary>
+      {children}
+    </details>
+  )
+}
+
+export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null), hidePrice = false, autoPlay = false, page = null }) {
+  if (!event) return null
   const body = (event.description || '')
     .split('\n')
     .filter((line) => !/^\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{267F}]/u.test(line.trim()))
     .join('\n')
     .trim()
-
-  const amenityTags = (event.tags || []).filter((t) => t.tag_group === 'amenity')
-  const pretty = (s) => s.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
-
   const endsAt = event.endDate ? new Date(event.endDate + 'T23:59:59') : null
   const hasEnded = !!endsAt && !Number.isNaN(endsAt.getTime()) && endsAt < new Date()
   const endedLabel = hasEnded
     ? endsAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : ''
-
   // Declared here, ABOVE the return, deliberately. A value referenced in JSX
   // but declared below it is the "Cannot access before initialization" white
   // screen this codebase has hit before, and vite build compiles it silently.
   const sheetSeason = seasonState(event)
+  const pillLabel = pillForEvent(event, page)
+
+  // Badges: every card badge, plus the price ones the card keeps on its photo.
+  const badgeIds = badgesFor(event, page)
+  const badgeTexts = badgeIds.map((id) => badgeLabel(id, pillLabel))
+  const freeEntry = event.free || (event.tags || []).some((t) => t && t.name === 'free-admission')
+  if (freeEntry && pillLabel !== 'Playground') badgeTexts.unshift('Free admission')
+  if (pillLabel === 'Playground') {
+    const names = new Set((event.tags || []).map((t) => t && t.name))
+    ;['bike-track', 'helmet-required', 'beginner-friendly', 'balance-bikes', 'restrooms', 'parking-onsite', 'toddler-area', 'inclusive-playground', 'splash-pad']
+      .filter((id) => names.has(id))
+      .forEach((id) => badgeTexts.push(badgeLabel(id, pillLabel)))
+  }
+
+  // Facts.
+  const range = sheetRange(event)
+  const dated = isDatedEvent(event)
+  const hoursLines = (event.hoursText || '').split('\n').map((l) => l.trim()).filter(Boolean)
+  const timeOnly = usableTime(event.timeLabel) ? event.timeLabel.trim() : ''
+  // Boat Rides keeps prices off its cards, but the sheet shows them (Oct 2026).
+  const priceSummary = event.price || (event.free ? 'Free' : '')
+  const tiers = event.priceTiers || []
+  const parking = (event.parkingInfo || '').trim()
+  const address = event.addressLine || ''
+  const highlights = event.highlights || []
 
   return (
     <div
@@ -727,13 +804,13 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto', paddingBottom: 26 }}
+        style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto', paddingBottom: 22 }}
       >
         <div style={{ position: 'relative' }}>
           <SheetMedia key={event.id} event={event} autoPlay={autoPlay} />
           <div
             onClick={onClose}
-            style={{ zIndex: 2, position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, lineHeight: 1, color: '#2D2D2D' }}
+            style={{ zIndex: 2, position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, color: '#2D2D2D' }}
           >
             ×
           </div>
@@ -747,66 +824,91 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
           </div>
         </div>
 
-        <div style={{ padding: '14px 18px 0' }}>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 700, color: '#2D2D2D', lineHeight: 1.25 }}>{event.title}</div>
-          <div style={{ fontSize: 11, color: '#888880', marginTop: 4 }}>
-            {event.city || event.area}{hidePrice ? '' : event.price ? ` · ${event.price}` : event.free ? ' · Free' : ''}
-          </div>
+        <div className="nx-sheetbody">
+          <div className="nx-sheettitle">{event.title}</div>
+
+          {badgeTexts.length > 0 && (
+            <div className="nx-sbadges">
+              {badgeTexts.map((t) => <span key={t} className="nx-badge">{t}</span>)}
+            </div>
+          )}
 
           {/* A link shared in October gets opened in December. Say so plainly
               rather than letting someone drive to a closed pumpkin patch. */}
-          {hasEnded && (
-            <div style={{ display: 'inline-block', marginTop: 9, background: '#F2EFEA', color: '#7a746d', fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 10 }}>
-              This ran until {endedLabel}
-            </div>
-          )}
-
-          {/* Same reasoning as hasEnded above, for seasonal venues rather than
-              dated events. A link shared in September gets opened in March, and
-              a sheet that says nothing implies the place is open today. */}
+          {hasEnded && <div className="nx-snote">This ran until {endedLabel}</div>}
           {sheetSeason.state === 'closed' && (
-            <div style={{ display: 'inline-block', marginTop: 9, background: '#F2EFEA', color: '#7a746d', fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 10 }}>
-              Closed for the season{sheetSeason.reopensMonth ? ` · back in ${sheetSeason.reopensMonth}` : ''}
-            </div>
+            <div className="nx-snote">Closed for the season{sheetSeason.reopensMonth ? ` · back in ${sheetSeason.reopensMonth}` : ''}</div>
           )}
           {sheetSeason.state === 'closing-soon' && (
-            <div style={{ display: 'inline-block', marginTop: 9, background: '#FEF0E6', color: '#C94F2C', fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 10 }}>
-              Closing soon{sheetSeason.closesMonth ? ` · season ends in ${sheetSeason.closesMonth}` : ''}
-            </div>
+            <div className="nx-snote soon">Closing soon{sheetSeason.closesMonth ? ` · season ends in ${sheetSeason.closesMonth}` : ''}</div>
           )}
 
-          {amenityTags.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
-              {amenityTags.map((t) => (
-                <div key={t.name} style={{ background: theme.accentSoft, color: theme.accent, fontSize: 9, fontWeight: 600, padding: '3px 8px', borderRadius: 10 }}>{pretty(t.name)}</div>
-              ))}
-            </div>
+          <div className="nx-facts">
+            {dated ? (
+              (range || timeOnly) && <FactRow label="📅 When" green>{[range, timeOnly].filter(Boolean).join(' · ')}</FactRow>
+            ) : (
+              <>
+                {range && <FactRow label="🗓 Open" green>{range}</FactRow>}
+                {hoursLines.length > 0 && hoursLines.length <= 2 && (
+                  <FactRow label="🕘 Hours">{hoursLines.map((l) => <span key={l} className="nx-fline">{l}</span>)}</FactRow>
+                )}
+                {hoursLines.length > 2 && (
+                  <FactDropdown label="🕘 Hours" summary={hoursLines[0]}>
+                    <ul className="nx-flist">{hoursLines.map((l) => <li key={l}><span>{l}</span></li>)}</ul>
+                  </FactDropdown>
+                )}
+                {hoursLines.length === 0 && timeOnly && <FactRow label="🕘 Hours">{timeOnly}</FactRow>}
+              </>
+            )}
+            {tiers.length > 0 ? (
+              <FactDropdown label="💵 Price" summary={priceSummary || 'See prices'}>
+                <ul className="nx-flist">
+                  {tiers.map((t, i) => <li key={i}><span>{t.label}</span><span>{t.price}</span></li>)}
+                </ul>
+              </FactDropdown>
+            ) : (
+              priceSummary && <FactRow label="💵 Price">{priceSummary}</FactRow>
+            )}
+            {parking && <FactRow label="🅿️ Parking">{parking}</FactRow>}
+            {address && <FactRow label="📍 Address">{address}</FactRow>}
+          </div>
+
+          {highlights.length > 0 ? (
+            <>
+              <p className="nx-slbl">Highlights</p>
+              <ul className="nx-shl">
+                {highlights.map((h, i) => {
+                  const m = h.match(/^(\S+)\s+(.*)$/u)
+                  const lead = m && /\p{Extended_Pictographic}/u.test(m[1])
+                  return <li key={i}><span>{lead ? m[1] : '•'}</span><span>{lead ? m[2] : h}</span></li>
+                })}
+              </ul>
+            </>
+          ) : (
+            body && <div className="nx-sbody-text">{body}</div>
           )}
 
-          {body && (
-            <div style={{ fontSize: 11.5, color: '#5C5C56', lineHeight: 1.65, marginTop: 12, whiteSpace: 'pre-line' }}>{body}</div>
-          )}
+          <p className="nx-sdisc">* Farm and local business hours, prices and attractions can change. Check their website and socials before you visit.</p>
 
-          <div style={{ display: 'flex', gap: 7, marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
             <div
               onClick={() => onDirections(event)}
-              style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: theme.dirBorder, background: theme.dirBg, textAlign: 'center', fontSize: 12, fontWeight: 600, color: theme.dirFg, cursor: 'pointer' }}
+              style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: theme.dirBorder, background: theme.dirBg, textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: theme.dirFg, cursor: 'pointer' }}
             >
               📍 Directions
             </div>
             <div
               onClick={() => onSelect(event)}
-              style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 12, fontWeight: 600, color: theme.learnFg, cursor: 'pointer' }}
+              style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: theme.learnFg, cursor: 'pointer' }}
             >
-              Learn more →
+              Visit website ↗
             </div>
           </div>
-
           <div
             onClick={onClose}
-            style={{ marginTop: 10, textAlign: 'center', fontSize: 11, color: '#888880', cursor: 'pointer', padding: '8px 0' }}
+            style={{ marginTop: 10, textAlign: 'center', fontSize: 12, color: '#888880', cursor: 'pointer', padding: '8px 0' }}
           >
-            See everything else nearby
+            ← {backLabel(pillLabel)}
           </div>
         </div>
       </div>

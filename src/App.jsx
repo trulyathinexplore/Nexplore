@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
 import { PILLS, PAGE_AMENITY_LABELS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent, pinStyleFor } from './constants.js'
+import { orderForPill, orderTopPicks, avoidSameFirst } from './ordering.js'
 import { sortClosedLast, isClosedForSeason } from './season.js'
 import {
   trackPillClick, trackEventClickThrough, trackFilterApplied, trackSearch,
@@ -459,7 +460,8 @@ const filtered = base.filter((ev) => {
   // Out-of-season venues drop to the bottom but stay visible, so a parent
   // planning a spring trip still finds Vasona in March. Year-round rows are
   // untouched, which today is everything outside Boat Rides.
-  const upcoming = sortClosedLast(upcomingUnsorted, now)
+  // Pumpkin Patches and Halloween have their own order (src/ordering.js).
+  const upcoming = orderForPill(pill, sortClosedLast(upcomingUnsorted, now), now)
 
   // Every single result is out of season: the season itself is over, and the
   // list needs to say so rather than looking like a normal browsable page.
@@ -749,9 +751,11 @@ const filtered = base.filter((ev) => {
       .filter((c) => !(isEventsPage && WIDE_CITIES.includes(c))),
   )].sort()
 
-  // Big swipe cards are the editor picks (the existing `featured` flag).
-  const featured = upcoming.filter((ev) => ev.isEditorPick)
-  const rest = upcoming.filter((ev) => !ev.isEditorPick)
+  // Big swipe cards are the editor picks (the existing `featured` flag), in
+  // your Top pick ranking (top_pick_rank). Since Oct 2026 they also stay in
+  // the main list, which never opens with the same place as the Top picks row.
+  const featured = orderTopPicks(upcoming.filter((ev) => ev.isEditorPick))
+  const rest = avoidSameFirst(upcoming, featured[0])
   const bigLabel = featureLabel(pill)
   const restWords = countLabel(pill, 2).replace(/^\d+\s+/, '').replace(/\s+to\s.*$/, '')
 
@@ -1038,6 +1042,7 @@ const filtered = base.filter((ev) => {
         onDirections={openDirections}
         onShare={shareEvent}
         hidePrice={hidePrice || hidesPriceForEvent(openEvent)}
+        page={pill}
       />
 
       <ShareSheet

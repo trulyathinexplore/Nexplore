@@ -9,7 +9,12 @@
 // is unscoped, which is the one job All was still quietly doing.
 export const PILLS = [
   { label: 'Playground',    type: 'category',  value: 'Playground',
-    fixedAmenities: ['free', 'restrooms', 'parking-onsite', 'splash-pad', 'toddler-area', 'inclusive-playground', 'reservable-picnic', 'bbq-grills', 'dog-friendly'] },
+    fixedAmenities: ['free', 'restrooms', 'parking-onsite', 'splash-pad', 'toddler-area', 'inclusive-playground', 'reservable-picnic', 'bbq-grills', 'dog-friendly', 'bike-track'] },
+  // Indoor Play (Oct 2026). Chips are KINDS of place; features such as Toddler
+  // zone, Drop-in and Socks required are badges on the card, not filters.
+  // Matched by category NAME so no id has to be hardcoded.
+  { label: 'Indoor Play', type: 'category', value: 'Indoor Play', expandable: true,
+    fixedAmenities: ['indoor-playground', 'free-space', 'arcade', 'mini-golf', 'trampoline-park', 'indoor-activity', 'bowling'] },
   // expandable: Learn more opens the card in place instead of linking out.
   // Only for pills whose rows are event-shaped, meaning they have a date, a
   // ticket and a description worth reading before deciding. A playground has
@@ -106,6 +111,7 @@ const COUNT_WORDS = {
   'Museum':          { one: 'museum',          many: 'museums',          verb: 'to explore' },
   'Beaches':         { one: 'beach',           many: 'beaches',          verb: 'to visit' },
   'Boat Rides':      { one: 'boat ride',       many: 'boat rides',       verb: 'to take' },
+  'Indoor Play':     { one: 'indoor spot',     many: 'indoor spots',     verb: 'to play' },
 }
 
 // Falls back to the old wording when a pill has no entry, so adding a pill
@@ -273,7 +279,80 @@ export const AMENITY_LABELS = {
   'santa-photos': '🎅 Santa photos',
   'train-ride': '🚂 Trains',
   'ice-skating': '⛸ Ice rink',
-  'christmas-village': '🎄 Christmas village'
+  'christmas-village': '🎄 Christmas village',
+  'free-admission': 'Free admission',
+  // Indoor Play kinds (chips)
+  'indoor-playground': '🛝 Indoor playgrounds',
+  'free-space': '🆓 Free spaces',
+  'arcade': '🕹️ Arcades',
+  'mini-golf': '⛳ Mini golf',
+  'trampoline-park': '🤸 Trampoline parks',
+  'indoor-activity': '🧩 Indoor activities',
+  'bowling': '🎳 Bowling',
+  'bike-track': '🚲 Bike tracks',
+  // Badges only (cards and the detail sheet)
+  'toddler-area': '🧸 Toddler zone',
+  'big-kids': '🧗 Big kids',
+  'drop-in': '🚪 Drop-in',
+  'cafe': '☕ Café',
+  'birthday-parties': '🎂 Birthday parties',
+  'socks-required': '🧦 Socks required',
+  'waiver-required': '📝 Waiver',
+  'indoor-outdoor': '🌤️ Indoor + outdoor',
+  'bumpers': '🎳 Bumpers',
+  'bowling-ramps': '🛝 Ramps for little kids',
+  'kids-bowl-free': '🆓 Kids Bowl Free',
+  'helmet-required': '⛑️ Helmet required',
+  'beginner-friendly': '🌱 Beginner friendly',
+  'balance-bikes': '🚲 Balance bikes OK',
+  'free-parking': '🅿️ Free parking',
+}
+
+// ---------------------------------------------------------------------------
+// Card badges (Oct 2026). White outlined badges on the card, in this order.
+// Default for a category: its own filter chips minus the price ones (Free,
+// Free admission live on the photo instead). A category listed here overrides
+// that. 'free-parking' is virtual: parking_info starting with "Free".
+// Playground keeps its own info line and is not covered by this.
+// ---------------------------------------------------------------------------
+const CARD_BADGES = {
+  'Pumpkin Patches': ['dog-friendly', 'wheelchair-accessible', 'free-parking', 'rides-games'],
+  'Halloween': ['family-friendly', 'no-spooks', 'home-display', 'haunted-maze', 'train-ride'],
+  'Indoor Play': ['indoor-outdoor', 'toddler-area', 'big-kids', 'drop-in', 'cafe', 'birthday-parties',
+                  'socks-required', 'waiver-required', 'bumpers', 'bowling-ramps', 'kids-bowl-free'],
+}
+const PRICE_CHIPS = ['free', 'free-admission']
+
+// Which pill a listing belongs to, for badges and the sheet's Back link, even
+// when it is shown with no pill active (search, a shared ?event= link).
+export function pillForEvent(ev, activeLabel) {
+  if (activeLabel && activeLabel !== 'Events') return activeLabel
+  const p = PILLS.find((x) => x.type !== 'eventType' && matchesPill(ev, x))
+  return p ? p.label : activeLabel || null
+}
+
+export function hasFreeParking(ev) {
+  return /^\s*free\b/i.test(ev?.parkingInfo || '')
+}
+
+// Badge ids for a card, in display order. Empty for Playground.
+export function badgesFor(ev, pillLabel) {
+  const label = pillForEvent(ev, pillLabel)
+  if (!label || label === 'Playground') return []
+  const pill = PILLS.find((x) => x.label === label)
+  const list = CARD_BADGES[label] || (pill?.fixedAmenities || []).filter((a) => !PRICE_CHIPS.includes(a))
+  const names = new Set((ev.tags || []).map((t) => t && t.name))
+  return list.filter((id) => (id === 'free-parking' ? hasFreeParking(ev) : names.has(id)))
+}
+
+export function badgeLabel(id, pillLabel) {
+  return PAGE_AMENITY_LABELS[pillLabel]?.[id] || AMENITY_LABELS[id] || id.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())
+}
+
+// "Back to all pumpkin patches" on the detail sheet.
+export function backLabel(pillLabel) {
+  const w = COUNT_WORDS[pillLabel]
+  return w ? `Back to all ${w.many}` : 'Back to the list'
 }
  
 // The same tag can read differently on one page. Checked before AMENITY_LABELS.
@@ -379,6 +458,7 @@ const PIN_STYLES = {
   'Museum':          { color: '#6B6B6B', selected: '#4A4A4A', icon: '🏛' },
   'County Fairs':    { color: '#D0487A', selected: '#A03259', icon: '🎡' },
   'Events':          { color: '#1A6B4A', selected: '#124D35', icon: '📅' },
+  'Indoor Play':     { color: '#D9822B', selected: '#A65F1A', icon: '🛝' },
 }
 
 export function pinStyleFor(pillLabel) {
