@@ -711,8 +711,17 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
     // to the actual business listing instead, the same result as Googling it.
     // The address stays in the query so a name Google doesn't recognise (the
     // pool events, say) still lands in the right place.
+    //
+    // Halloween map rows are the exception (Oct 27, 2026): a decorated house
+    // has no Google listing, so "Harry Potter House Sunnyvale, 587 Sunnymount
+    // Ave" made Maps search for a business and miss the house. For those the
+    // address goes alone, and a street with no address goes as coordinates.
+    const onMap = !!ev.mapKind && ev.mapKind !== 'rollup'
+    const hasStreetAddress = !!ev.fullAddress && /\d/.test(ev.fullAddress)
     const q = encodeURIComponent(
-      ev.fullAddress ? `${ev.title}, ${ev.fullAddress}` : ev.title,
+      onMap
+        ? (hasStreetAddress ? ev.fullAddress : (typeof ev.lat === 'number' ? `${ev.lat},${ev.lng}` : ev.fullAddress || ev.title))
+        : (ev.fullAddress ? `${ev.title}, ${ev.fullAddress}` : ev.title),
     )
     window.open(`https://maps.google.com/?q=${q}`, '_blank')
   }
