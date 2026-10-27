@@ -146,6 +146,16 @@ export function mapEvent(e) {
     parkingInfo: e.parking_info || '',
     topPickRank: Number.isFinite(e.top_pick_rank) ? e.top_pick_rank : null,
     indoorOutdoor: e.indoor_outdoor || '',
+    // Halloween map (Oct 27, 2026). All four are added by halloween-map.sql;
+    // until it runs they are undefined and every row behaves as before.
+    //   map_kind  'yard' | 'maze' | 'street' | 'rollup' | null — picks the pin
+    //   map_city  slug of the city map the row belongs to ('tri-valley')
+    //   map_only  true = pin on the map, never a card on the list
+    //   map_path  [[lat,lng],...] for a street, drawn as a line under its pin
+    mapKind: e.map_kind || null,
+    mapCity: e.map_city || null,
+    mapOnly: e.map_only === true,
+    mapPath: Array.isArray(e.map_path) && e.map_path.length > 1 ? e.map_path : null,
   }
 }
  
@@ -196,6 +206,10 @@ export function mapBeach(beach) {
     parkingInfo: '',
     topPickRank: null,
     indoorOutdoor: 'outdoor',
+    mapKind: null,
+    mapCity: null,
+    mapOnly: false,
+    mapPath: null,
   }
 }
  

@@ -197,7 +197,9 @@ function statusLine(ev) {
 // detail sheet, which lists every badge. Lines are measured, not guessed,
 // because badge widths depend on the phone.
 function CardBadges({ ev, page, onMore }) {
-  const ids = badgesFor(ev, page)
+  // City roll-ups (Home Haunt Tour, Trick or Treat in <city>) lead with a
+  // "Self-guided tour" chip; AMENITY_LABELS in constants.js spells it.
+  const ids = ev.mapKind === 'rollup' ? ['self-guided-tour', ...badgesFor(ev, page)] : badgesFor(ev, page)
   const label = pillForEvent(ev, page)
   const measureRef = useRef(null)
   const [shown, setShown] = useState(ids.length)
@@ -315,6 +317,11 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
         <div className="nx-actions">
           {pg ? (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onDirections(ev) }}>📍 Directions</button>
+          ) : ev.mapKind === 'rollup' ? (
+            // A city roll-up ("Palo Alto Home Haunt Tour", "Trick or Treat in
+            // Palo Alto"): the whole card IS the map, so the button says so.
+            // App.jsx routes a roll-up straight to that city's map.
+            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onLearnMore(ev) }}>🗺 Open the map</button>
           ) : (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onLearnMore(ev) }}>Learn more</button>
           )}
@@ -341,6 +348,8 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
         <div className="nx-actions">
           {pg ? (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onDirections(ev) }}>📍 Directions</button>
+          ) : ev.mapKind === 'rollup' ? (
+            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); open() }}>🗺 Open the map</button>
           ) : (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); open() }}>Learn more</button>
           )}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { cardBg, REGIONS, themeFor, badgesFor, badgeLabel, pillForEvent, backLabel } from '../constants.js'
+import { cardBg, REGIONS, themeFor, badgesFor, badgeLabel, pillForEvent, backLabel, mapKindLabel, MAP_KINDS } from '../constants.js'
 import { seasonState } from '../season.js'
 
 export function SearchIcon() {
@@ -160,8 +160,12 @@ export function addToCalendar(event) {
 // onToggleExpand is absent the card behaves exactly as it always has and
 // Learn more opens the official site, which is what every other pill still
 // wants: a playground has nothing to expand into.
-export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false, expanded = false, onToggleExpand = null, wide = false }) {
+// Halloween map (Oct 27, 2026): when `onTourToggle` is passed the card grows
+// one checkbox row, "Add to tour", above its buttons. Nothing else about the
+// card changes, which is the point: the pin card on the map IS the list card.
+export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false, expanded = false, onToggleExpand = null, wide = false, tourChecked = false, onTourToggle = null, tourFull = false }) {
   const canExpand = !!onToggleExpand
+  const kindLabel = mapKindLabel(event)
 
   // Is there anywhere worth sending someone? A missing url, a placeholder '#',
   // or a Google Maps link all mean no. The maps case is the interesting one:
@@ -270,6 +274,10 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
   ].filter(Boolean)
 
   const chips = []
+  // The map kind reads first: "🎃 Yard Display", "😱 Haunted Maze / Paid",
+  // "🍬 Trick or Treat". Only rows with a map_kind get it.
+  if (kindLabel) chips.push({ key: 'kind', label: `${MAP_KINDS[event.mapKind].icon} ${kindLabel}`, bg: '#F7F4EF', fg: '#2D2D2D' })
+  if (event.mapKind === 'rollup') chips.push({ key: 'tour', label: '🗺 Self-guided tour', bg: '#2D2D2D', fg: 'white' })
   if (showAges) chips.push({ key: 'ages', label: `Ages ${event.ages}`, bg: '#E8F5EE', fg: '#1A6B4A' })
   if (event.needsReservation) chips.push({ key: 'res', label: '🎟 Reservation required', bg: '#FEF0E6', fg: '#C94F2C' })
   if (event.category === 'Playground') {
@@ -378,6 +386,22 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
               </div>
             )}
 
+            {onTourToggle && (
+              <label
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, fontSize: 11.5, fontWeight: 700, color: tourFull && !tourChecked ? '#B5B0A8' : '#2D2D2D', cursor: tourFull && !tourChecked ? 'default' : 'pointer' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={tourChecked}
+                  disabled={tourFull && !tourChecked}
+                  onChange={(e) => onTourToggle(event, e.target.checked)}
+                  style={{ width: 18, height: 18, margin: 0, accentColor: '#1A6B4A' }}
+                />
+                {tourChecked ? 'Added to tour' : tourFull ? 'Tour is full (9 stops)' : 'Add to tour'}
+              </label>
+            )}
+
             {/* Same two-button row the Playground cards use. Directions is
                 especially worth having here now that pumpkin patches carry real
                 street addresses — before, openDirections could only send Google
@@ -405,7 +429,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
                   onClick={(e) => { e.stopPropagation(); canExpand ? onToggleExpand(event) : onSelect(event) }}
                   style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 9.5, fontWeight: 600, color: theme.learnFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
-                  {canExpand ? (expanded ? 'Close ▲' : 'Learn more ▾') : 'Learn more →'}
+                  {event.mapKind === 'rollup' ? '🗺 Open the map' : canExpand ? (expanded ? 'Close ▲' : 'Learn more ▾') : 'Learn more →'}
                 </div>
               )}
             </div>
@@ -755,7 +779,10 @@ function FactDropdown({ label, summary, children }) {
   )
 }
 
-export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null), hidePrice = false, autoPlay = false, page = null }) {
+// tourChecked / onTourToggle / tourFull: Halloween map (Oct 27, 2026). When
+// onTourToggle is passed, one full-width "Add to tour" checkbox row sits under
+// Directions / Visit website. Same prop names as EventCard.
+export function EventSheet({ event, onClose, onSelect, onDirections, onShare, theme = themeFor(null), hidePrice = false, autoPlay = false, page = null, tourChecked = false, onTourToggle = null, tourFull = false }) {
   if (!event) return null
   const body = (event.description || '')
     .split('\n')
@@ -904,6 +931,12 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
               Visit website ↗
             </div>
           </div>
+          {onTourToggle && (
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 8, padding: '11px 0', borderRadius: 10, border: '1.5px solid #1A6B4A', background: tourChecked ? '#1A6B4A' : '#E8F5EE', color: tourChecked ? 'white' : '#0F5238', fontSize: 12.5, fontWeight: 700, cursor: tourFull && !tourChecked ? 'default' : 'pointer', opacity: tourFull && !tourChecked ? .55 : 1 }}>
+              <input type="checkbox" checked={tourChecked} disabled={tourFull && !tourChecked} onChange={(e) => onTourToggle(event, e.target.checked)} style={{ width: 18, height: 18, margin: 0, accentColor: '#1A6B4A' }} />
+              {tourChecked ? 'Added to tour' : tourFull ? 'Tour is full (9 stops)' : 'Add to tour'}
+            </label>
+          )}
           <div
             onClick={onClose}
             style={{ marginTop: 10, textAlign: 'center', fontSize: 12, color: '#888880', cursor: 'pointer', padding: '8px 0' }}

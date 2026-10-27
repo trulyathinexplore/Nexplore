@@ -162,3 +162,45 @@ export const trackEmptyState = (kind, pillLabel) => {
     pill_name: pillLabel,
   });
 };
+
+// ---------------------------------------------------------------------------
+// Halloween map (Oct 27, 2026). The question these answer is whether the map
+// turns into drives: a route opened in Google Maps is the conversion. Mark
+// `tour_route_opened` as a key event in GA4, and register `kind`, `city`,
+// `stops`, `zip`, `radius`, `results` and `source` as custom dimensions
+// BEFORE deploying, or the breakdowns never backfill.
+// ---------------------------------------------------------------------------
+
+// A stop checked or unchecked. `source` is 'pin_card' | 'detail_sheet'.
+export const trackTourStop = (on, ev, city, source) => {
+  trackEvent(on ? 'tour_stop_added' : 'tour_stop_removed', {
+    kind: ev?.mapKind || 'listing',
+    share_label: ev?.title,
+    event_id: ev?.id,
+    city: city || 'all',
+    source,
+  });
+};
+
+// "Open route" tapped: one Google Maps route created. counts is
+// { yard, maze_free, maze_paid, street }.
+export const trackTourRoute = (stops, counts, city) => {
+  trackEvent('tour_route_opened', {
+    stops,
+    yard: counts.yard || 0,
+    maze_free: counts.maze_free || 0,
+    maze_paid: counts.maze_paid || 0,
+    street: counts.street || 0,
+    city: city || 'all',
+  });
+};
+
+export const trackTourClear = (stops, city) => {
+  trackEvent('tour_cleared', { stops, city: city || 'all' });
+};
+
+// Zip typed on the Halloween map. `results` is the pin count inside the
+// radius, so zips that return 0 are the places to add content next.
+export const trackZipSearch = (zip, radius, results) => {
+  trackEvent('map_zip_search', { zip, radius, results });
+};

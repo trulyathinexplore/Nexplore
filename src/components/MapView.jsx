@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { EventCard, ShareGlyph } from './ui.jsx'
-import { hidesPriceForEvent, pinStyleFor } from '../constants.js'
+import { hidesPriceForEvent, pinStyleFor, pinStyleForEvent, MAP_KINDS } from '../constants.js'
 
 // Leaflet + CARTO basemap tiles. No API key, no account, no billing.
 //
@@ -98,7 +98,14 @@ function loadLeaflet() {
 // contained: render inside the page (the redesign's map box) instead of as a
 // full-screen layer. The page head already carries the Map/List and Share
 // buttons, so the top bar is dropped in that mode.
-export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, pin = pinStyleFor(null), hidePrice = false, contained = false }) {
+// pinFor / tour props: Halloween map (Oct 27, 2026). `pinFor(ev)` lets one map
+// carry several pin kinds (yard 🎃, maze 😱, street 🍬) keyed by the row's
+// map_kind; a row with map_path is also drawn as a line under its pin. The
+// tour props thread straight into the pin card, which is the list's EventCard.
+// `legend` is an array of { icon, label } shown top-left; `overlay` is any
+// extra element rendered inside the canvas (the zip-radius control).
+export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, pin = pinStyleFor(null), hidePrice = false, contained = false, pinFor = null, tourIds = null, onTourToggle = null, tourFull = false, legend = null, overlay = null, focusId = null, circle = null }) {
+  const pinOf = (ev) => (pinFor ? pinFor(ev) : pin)
   const holder = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -142,7 +149,11 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
   }, [])
 
   // Redraw markers whenever the filtered set changes, so the map always shows
-  // exactly what the list would show.
+  // exactly what the list would show. Keyed on the ids and coordinates, not on
+  // the array: App rebuilds `mappable` on every render, and redrawing on each
+  // one cleared the selected pin (and its card) the moment anything in App
+  // changed state, such as checking "Add to tour".
+  const plottedKey = plotted.map((e) => `${e.id}:${e.lat},${e.lng}`).join('|')
   useEffect(() => {
     const L = window.L
     const map = mapRef.current
@@ -152,7 +163,14 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
     markersRef.current = []
 
     plotted.forEach((ev) => {
-      const marker = L.marker([ev.lat, ev.lng], { icon: leafletIcon(L, false, pin), title: ev.title, riseOnHover: true })
+      // A trick-or-treat street: the street itself, under the pin.
+      if (ev.mapPath) {
+        const line = L.polyline(ev.mapPath, { color: pinOf(ev).color, weight: 7, opacity: .85, lineCap: 'round', lineJoin: 'round', interactive: false })
+        line.__eventId = ev.id
+        line.addTo(map)
+        markersRef.current.push(line)
+      }
+      const marker = L.marker([ev.lat, ev.lng], { icon: leafletIcon(L, false, pinOf(ev)), title: ev.title, riseOnHover: true })
       marker.__eventId = ev.id
       marker.on('click', (e) => {
         // Without this the click also reaches the map and immediately clears
@@ -170,8 +188,8 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
     } else if (plotted.length > 1) {
       map.fitBounds(L.latLngBounds(plotted.map((ev) => [ev.lat, ev.lng])), { padding: [40, 40] })
     }
-    setSelected(null)
-  }, [status, events, pin])
+    setSelected((cur) => (cur && plotted.some((e) => e.id === cur.id) ? cur : null))
+  }, [status, plottedKey, pin])
 
   // Recolour in place: rebuilding the whole marker set on every tap would make
   // the map flicker and drop the tap target out from under the finger.
@@ -179,11 +197,35 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
     const L = window.L
     if (status !== 'ready' || !L) return
     markersRef.current.forEach((m) => {
+      if (!m.setIcon) return // a street line, not a marker
       const on = selected && m.__eventId === selected.id
-      m.setIcon(leafletIcon(L, on, pin))
+      const ev = plotted.find((e) => e.id === m.__eventId)
+      m.setIcon(leafletIcon(L, on, ev ? pinOf(ev) : pin))
       m.setZIndexOffset(on ? 1000 : 0)
     })
   }, [selected, status, pin])
+
+  // Zip radius: a faint green disc around the zip centre, refit to it.
+  const circleRef = useRef(null)
+  useEffect(() => {
+    const L = window.L
+    const map = mapRef.current
+    if (status !== 'ready' || !L || !map) return
+    if (circleRef.current) { circleRef.current.remove(); circleRef.current = null }
+    if (!circle) return
+    circleRef.current = L.circle(circle.center, { radius: circle.miles * 1609.34, color: '#1A6B4A', weight: 1.5, fillColor: '#1A6B4A', fillOpacity: .06, interactive: false }).addTo(map)
+    map.fitBounds(circleRef.current.getBounds(), { padding: [20, 20] })
+  }, [status, circle && circle.center && circle.center.join(','), circle && circle.miles])
+
+  // A card asked to be shown on the map ("See on map" from the list): select
+  // its pin and fly to it once the map is ready.
+  useEffect(() => {
+    if (status !== 'ready' || focusId == null || !mapRef.current) return
+    const ev = plotted.find((e) => String(e.id) === String(focusId))
+    if (!ev) return
+    setSelected(ev)
+    mapRef.current.flyTo([ev.lat, ev.lng], Math.max(mapRef.current.getZoom(), 15), { duration: .6 })
+  }, [status, focusId])
 
   return (
     <div style={contained
@@ -249,6 +291,13 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
           </div>
         )}
 
+        {legend && legend.length > 0 && (
+          <div style={{ position: 'absolute', left: 10, top: 10, zIndex: 500, display: 'flex', flexWrap: 'wrap', gap: '4px 10px', background: 'rgba(255,255,255,.95)', border: '0.5px solid #E2DDD6', borderRadius: 10, padding: '5px 9px', fontSize: 10.5, fontWeight: 600, color: '#2D2D2D', maxWidth: 'calc(100% - 70px)' }}>
+            {legend.map((l) => <span key={l.label}>{l.icon} {l.label}</span>)}
+          </div>
+        )}
+        {overlay}
+
         {status === 'ready' && plotted.length === 0 && (
           <div style={{ position: 'absolute', left: 16, right: 16, top: 16, zIndex: 500, background: 'rgba(255,255,255,.95)', border: '0.5px solid #E2DDD6', borderRadius: 10, padding: '11px 14px', fontSize: 11.5, color: '#888880', lineHeight: 1.6 }}>
             Nothing in this filter has a location yet.
@@ -297,6 +346,9 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
                 onShare={onShare}
                 isEditorPick={selected.isEditorPick}
                 hidePrice={hidePrice || hidesPriceForEvent(selected)}
+                tourChecked={!!tourIds && tourIds.has(selected.id)}
+                onTourToggle={onTourToggle}
+                tourFull={tourFull}
               />
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
-import { PILLS, PAGE_AMENITY_LABELS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent, pinStyleFor } from './constants.js'
+import { PILLS, PAGE_AMENITY_LABELS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent, pinStyleFor, pinStyleForEvent, MAP_KINDS, HALLOWEEN_MAP_CITIES } from './constants.js'
 import { orderForPill, orderTopPicks, avoidSameFirst } from './ordering.js'
 import { sortClosedLast, isClosedForSeason } from './season.js'
 import {
@@ -8,6 +8,7 @@ import {
   trackPageEngagement, trackJuly4thFilter, trackShare,
   trackCategoryView, trackScrollDepth, trackAmenityFilter, trackMapOpen,
   trackMapPinClick, trackShareArrival, trackSearchNoResults, trackEmptyState,
+  trackTourStop, trackTourRoute, trackTourClear, trackZipSearch,
 } from './analytics.js'
 import { readFilters, writeFilters } from './urlState.js'
 import {
@@ -20,6 +21,7 @@ import {
   targets, copyLink, canNativeShare, nativeShare,
 } from './share.js'
 import MapView from './components/MapView.jsx'
+import { TourBar, ZipRadius, tourRouteUrl, tourCounts, milesBetween, geocodeZip } from './components/HalloweenMap.jsx'
 import {
   DayRibbon, Mosaic, SeasonCard, GROUPS, WIDE_CITIES, groupsOf, groupName, groupChips,
   collapseSeries, seasonPagesNow, onDay, dayTitle,
@@ -46,8 +48,23 @@ const outOfSeasonHeadline = (pillLabel) =>
 // amusement parks) are linked to venues that already carry lat/lng, so without
 // this gate the Map button turns up on almost every pill. Add a label here when
 // a category is ready to be mapped.
-const MAP_ENABLED_PILLS = ['Pumpkin Patches', 'Playground']
+const MAP_ENABLED_PILLS = ['Pumpkin Patches', 'Playground', 'Halloween']
+
+// The Halloween map's tour: at most this many stops, which is what Google Maps
+// accepts as waypoints on one route link.
+const MAX_TOUR_STOPS = 9
 const REGION_LABELS = Object.keys(REGION_CITIES)
+
+// Does this row belong on the Halloween map named `cityName`? A row says so
+// itself through map_city; failing that, the map's own city list decides.
+// Lets Tri-Valley pool Livermore, Pleasanton and San Ramon, and keeps the one
+// Santa Clara house on the Sunnyvale map.
+function onCityMap(ev, cityName) {
+  const entry = HALLOWEEN_MAP_CITIES.find((c) => c.name === cityName)
+  if (!entry) return false
+  if (ev.mapCity) return ev.mapCity === entry.slug
+  return ev.seasonalType === 'halloween' && entry.cities.includes(ev.city)
+}
 const prettify = (t) => t.replace(/-/g, ' ').replace(/\b\w/, (c) => c.toUpperCase())
 const getAmenityLabel = (id, page) => PAGE_AMENITY_LABELS[page]?.[id] || AMENITY_LABELS[id] || prettify(id)
   const NOW = new Date()
@@ -141,6 +158,12 @@ export default function App() {
   // The id from ?event= on a shared link, held until the sheet is closed.
   const [openEventId, setOpenEventId] = useState(init.event)
   const [sheetAutoPlay, setSheetAutoPlay] = useState(false)
+  // Halloween map (Oct 27, 2026). The tour is the ids checked "Add to tour",
+  // in the order they were checked; the zip search narrows the map to a
+  // radius around a zip's centre; focusId is a pin the list asked to show.
+  const [tour, setTour] = useState([])
+  const [zip, setZip] = useState({ code: '', radius: 10, center: null, error: null })
+  const [focusId, setFocusId] = useState(null)
   // The pinned filter/title block sits right under the sticky header; keep its
   // offset equal to the header's real height.
   useEffect(() => {
@@ -220,7 +243,7 @@ export default function App() {
   // share, so it needs no tracking parameter to be recognisable.
   useEffect(() => {
     if (init.event) trackShareArrival('event', String(init.event))
-    else if (init.map) trackShareArrival('map', init.pill)
+    else if (init.map) trackShareArrival('map', new URLSearchParams(window.location.search).get('src') === 'share' ? `halloween-map-${init.city || 'all'}` : init.pill)
     else if (window.location.search.includes('view=')) trackShareArrival('view', init.pill)
   }, [])
 
@@ -331,6 +354,8 @@ export default function App() {
       trackPillClick(label)
     }
     setShowMap(false)
+    setTour([])
+    setZip({ code: '', radius: 10, center: null, error: null })
   }
 
   // Back to the front door, from the home pill or the wordmark. Clears every
@@ -413,7 +438,7 @@ export default function App() {
     if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
 
     // On Events, chain-store listings ("Bay Area") show under every city.
-    if (city && (ev.city || '') !== city && !(isEventsPage && WIDE_CITIES.includes(ev.city))) return false
+    if (city && (ev.city || '') !== city && !(isEventsPage && WIDE_CITIES.includes(ev.city)) && !onCityMap(ev, city)) return false
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
     if (nextWeekend && ev.startDate && !isNextWeekend(ev.startDate)) return false
     // NEW: Month filter based on selectedMonthFilter
@@ -423,11 +448,18 @@ export default function App() {
 
   const base = events.filter(passesBase)
 
+  // 'trick-or-treat-street' is a map_kind, not a tag, so it is matched here.
+  const matchesAmenity = (ev, a) => {
+    if (a === 'free') return ev.free === true
+    if (a === 'trick-or-treat-street') return ev.mapKind === 'street'
+    return ev.tags.some((t) => t.name === a)
+  }
+
   // Amenity sub-pills: use a fixed curated list if the active pill declares one (Playground, Water Play),
   // otherwise fall back to the original dynamic computation (Farm, Museum, County Fairs, etc. — unchanged)
   // A fixed pill list hides any amenity no card in view has, so a tap never
   // leads to an empty list. A pill the user already selected always stays.
-  const hasAmenity = (ev, a) => (a === 'free' ? ev.free === true : ev.tags.some((t) => t.name === a))
+  const hasAmenity = matchesAmenity
   const amenityOptions = activePill?.fixedAmenities
     ? activePill.fixedAmenities.filter((a) => amenities.includes(a) || base.some((ev) => hasAmenity(ev, a)))
     : [...new Set(
@@ -446,16 +478,19 @@ export default function App() {
       )].sort()
 
   // 'free' is a special case — it maps to price_type ('ev.free'), not a tag, so it can't be matched via ev.tags
-const filtered = base.filter((ev) => {
-    return amenities.every((a) => {
-      if (a === 'free') return ev.free === true
-      return ev.tags.some((t) => t.name === a)
-    })
-  })
+const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev, a)))
+
+  // map_only rows (yard displays, trick-or-treat streets) are pins, never
+  // cards: they come off the list here and rejoin below for the map. The
+  // per-city "Trick or Treat in <city>" roll-up is the opposite: a card with
+  // no pin, so it stays in.
+  const filtered = filteredAll.filter((ev) => !ev.mapOnly)
 
   const now = new Date()
-  const upcomingUnsorted = filtered.filter((ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now)
+  const isUpcoming = (ev) => !ev.endDate || new Date(ev.endDate + 'T23:59:59') >= now
+  const upcomingUnsorted = filtered.filter(isUpcoming)
   const past = filtered.filter((ev) => ev.endDate && new Date(ev.endDate + 'T23:59:59') < now)
+  const mapOnlyUpcoming = filteredAll.filter((ev) => ev.mapOnly && isUpcoming(ev))
 
   // Out-of-season venues drop to the bottom but stay visible, so a parent
   // planning a spring trip still finds Vasona in March. Year-round rows are
@@ -488,9 +523,56 @@ const filtered = base.filter((ev) => {
   // As coordinates land on other categories, it starts appearing there too,
   // with no further changes here.
   const mapEnabled = MAP_ENABLED_PILLS.includes(activePill?.label)
+  const isHalloween = activePill?.label === 'Halloween'
+  const hasCoords = (ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number'
+  const inZip = (ev) => !zip.center || milesBetween(zip.center, [ev.lat, ev.lng]) <= zip.radius
   const mappable = mapEnabled
-    ? upcoming.filter((ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number')
+    ? [...upcoming, ...mapOnlyUpcoming].filter((ev) => hasCoords(ev) && ev.mapKind !== 'rollup' && inZip(ev))
     : []
+
+  // ---- Halloween tour ----------------------------------------------------
+  const tourSet = new Set(tour)
+  const tourEvents = tour.map((id) => events.find((ev) => ev.id === id)).filter(Boolean)
+  const tourFull = tour.length >= MAX_TOUR_STOPS
+  const toggleTour = (ev, on, source) => {
+    setTour((cur) => {
+      if (on && cur.length >= MAX_TOUR_STOPS) return cur
+      const next = on ? [...cur.filter((id) => id !== ev.id), ev.id] : cur.filter((id) => id !== ev.id)
+      trackTourStop(on, ev, city, source)
+      return next
+    })
+  }
+  const openTourRoute = () => {
+    const counts = tourCounts(tourEvents)
+    trackTourRoute(tourEvents.length, counts, city)
+    window.open(tourRouteUrl(tourEvents), '_blank')
+  }
+  const clearTour = () => { trackTourClear(tour.length, city); setTour([]) }
+
+  // Zip search on the Halloween map. The lookup goes through Nominatim, which
+  // the app already uses for addresses (see resolveCoords in supabase.js).
+  const runZip = async (code, radius) => {
+    if (!/^\d{5}$/.test(code)) { setZip({ code, radius, center: null, error: code ? 'Enter a 5-digit zip code.' : null }); return }
+    const center = await geocodeZip(code)
+    if (!center) { setZip({ code, radius, center: null, error: `Couldn't find ${code}. Try a Bay Area zip.` }); trackZipSearch(code, radius, 0); return }
+    setCity(null)
+    setZip({ code, radius, center, error: null })
+    const n = [...upcoming, ...mapOnlyUpcoming].filter((ev) => hasCoords(ev) && milesBetween(center, [ev.lat, ev.lng]) <= radius).length
+    trackZipSearch(code, radius, n)
+  }
+  const clearZip = () => setZip({ code: '', radius: 10, center: null, error: null })
+
+  // "Trick or Treat in <city>" roll-up card: Learn more opens that city's map.
+  const openCityMap = (ev) => {
+    const entry = HALLOWEEN_MAP_CITIES.find((c) => c.slug === ev.mapCity) || HALLOWEEN_MAP_CITIES.find((c) => c.cities.includes(ev.city))
+    setCity(entry ? entry.name : ev.city || null)
+    setZip({ code: '', radius: 10, center: null, error: null })
+    setFocusId(null)
+    openMap('rollup_card')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  // "See on map" from a listed haunted maze: open the map on its pin.
+  const showOnMap = (ev) => { setFocusId(ev.id); openMap('see_on_map'); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
   // Back-fill coordinates for anything that has a street address but no
   // lat/lng, looked up once and written back. The
@@ -606,6 +688,7 @@ const filtered = base.filter((ev) => {
   }
 
   const openOfficial = (ev) => {
+    if (ev.mapKind === 'rollup') { openCityMap(ev); return }
     trackEventClickThrough(ev.title, 'learn_more')
     if (ev.officialUrl && ev.officialUrl !== '#') window.open(ev.officialUrl, '_blank')
   }
@@ -678,10 +761,10 @@ const filtered = base.filter((ev) => {
           // Rebuilt from the pill, NOT copied from the address bar. Region,
           // amenity chips and search stay behind: a recipient opening a list
           // cut down to four cards assumes that is the whole catalogue.
-          url: viewUrl(pill, isMap),
+          url: viewUrl(pill, isMap, isMap ? city : null),
           text: viewShareText(pill, n, isMap),
           subject: `Nexplore: ${pill || 'things to do'}`,
-          label: `${isMap ? 'map' : 'view'}:${pill}`,
+          label: isMap && isHalloween ? `halloween-map-${city || 'all'}` : `${isMap ? 'map' : 'view'}:${pill}`,
         }
       })()
 
@@ -759,7 +842,10 @@ const filtered = base.filter((ev) => {
   const bigLabel = featureLabel(pill)
   const restWords = countLabel(pill, 2).replace(/^\d+\s+/, '').replace(/\s+to\s.*$/, '')
 
-  const openSheet = (ev, play = false) => { trackEventClickThrough(ev.title, play ? 'watch_video' : 'expand'); setSheetAutoPlay(!!play); setOpenEventId(ev.id) }
+  const openSheet = (ev, play = false) => {
+    if (ev.mapKind === 'rollup') { openCityMap(ev); return }
+    trackEventClickThrough(ev.title, play ? 'watch_video' : 'expand'); setSheetAutoPlay(!!play); setOpenEventId(ev.id)
+  }
 
   // "Clear all": first pill whenever at least one filter is on. Clears Near too.
   const activeFilterCount = [freeOnly, !!city, !!region, weekend, nextWeekend, !!selectedMonthFilter, !!dayPick]
@@ -796,8 +882,8 @@ const filtered = base.filter((ev) => {
           <select id="nx-city" value={region && !city ? `region:${region}` : (city || '')} onChange={(e) => { const v = e.target.value; setRegion(v.startsWith('region:') ? v.slice(7) : null); setCity(v && !v.startsWith('region:') ? v : null) }}>
             <option value="">All Bay Area</option>
             {region && <option value={`region:${region}`}>{region}</option>}
-            {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-            {city && !cityOptions.includes(city) && <option value={city}>{city}</option>}
+            {(isHalloween ? HALLOWEEN_MAP_CITIES.map((c) => c.name) : cityOptions).map((c) => <option key={c} value={c}>{c}</option>)}
+            {city && !cityOptions.includes(city) && !HALLOWEEN_MAP_CITIES.some((c) => c.name === city) && <option value={city}>{city}</option>}
           </select>
         </label>
       </div>
@@ -872,12 +958,22 @@ const filtered = base.filter((ev) => {
                 events={mappable}
                 theme={theme}
                 pin={pinStyleFor(activePill?.label)}
-                onSelect={openOfficial}
+                pinFor={isHalloween ? (ev) => pinStyleForEvent(ev, pill) : null}
+                legend={isHalloween ? Object.values(MAP_KINDS).map((k) => ({ icon: k.icon, label: k.label })) : null}
+                overlay={isHalloween ? <ZipRadius zip={zip} onSearch={runZip} onClear={clearZip} /> : null}
+                circle={zip.center ? { center: zip.center, miles: zip.radius } : null}
+                tourIds={isHalloween ? tourSet : null}
+                onTourToggle={isHalloween ? (ev, on) => toggleTour(ev, on, 'pin_card') : null}
+                tourFull={tourFull}
+                focusId={focusId}
+                // Learn more on a pin card opens the detail sheet, the same one
+                // the list opens, on pills that have one.
+                onSelect={canExpand ? (ev) => openSheet(ev) : openOfficial}
                 onDirections={openDirections}
                 onShare={shareEvent}
                 onShareView={shareMap}
-                onPinClick={(ev) => trackMapPinClick(ev.title, pill)}
-                onClose={() => setShowMap(false)}
+                onPinClick={(ev) => { setFocusId(null); trackMapPinClick(ev.title, pill) }}
+                onClose={() => { setShowMap(false); setFocusId(null) }}
                 hidePrice={hidePrice}
               />
             </div>
@@ -1016,7 +1112,7 @@ const filtered = base.filter((ev) => {
           <div style={{ height: 80 }} />
 
           {/* Floating map button, bottom middle, same as today. */}
-          {!loading && mappable.length > 0 && !showMap && !openEvent && !shareTarget && (
+          {!loading && mappable.length > 0 && !showMap && !openEvent && !shareTarget && !(isHalloween && tourEvents.length > 0) && (
             <button
               onClick={() => { openMap('floating_button'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
               style={{
@@ -1043,7 +1139,15 @@ const filtered = base.filter((ev) => {
         onShare={shareEvent}
         hidePrice={hidePrice || hidesPriceForEvent(openEvent)}
         page={pill}
+        tourChecked={!!openEvent && tourSet.has(openEvent.id)}
+        onTourToggle={isHalloween && openEvent && openEvent.mapKind && openEvent.mapKind !== 'rollup' ? (ev, on) => toggleTour(ev, on, 'detail_sheet') : null}
+        tourFull={tourFull}
       />
+
+      {/* The Halloween tour bar: slides up once a stop is checked. */}
+      {isHalloween && tourEvents.length > 0 && !openEvent && !shareTarget && (
+        <TourBar stops={tourEvents} onOpen={openTourRoute} onClear={clearTour} max={MAX_TOUR_STOPS} />
+      )}
 
       <ShareSheet
         open={!!shareTarget}

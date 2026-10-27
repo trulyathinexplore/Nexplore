@@ -56,7 +56,10 @@ export const PILLS = [
     // house once, and it means the label map only has to carry one word for it.
     // 'train-ride' is the Holiday Events tag, reused. Here it reads
     // "Halloween train rides" (see PAGE_AMENITY_LABELS below).
-    fixedAmenities: ['no-spooks', 'free', 'family-friendly', 'haunted-maze', 'home-display', 'train-ride'],
+    // 'trick-or-treat-street' (Oct 27, 2026) is the ONE new chip for the
+    // Halloween map. It is a map_kind, not a tag: App.jsx matches it against
+    // ev.mapKind === 'street' so a street row needs no tag to show up here.
+    fixedAmenities: ['no-spooks', 'free', 'family-friendly', 'haunted-maze', 'home-display', 'train-ride', 'trick-or-treat-street'],
   },
   { label: 'Fruit Picking',  type: 'category', value: 17,
     fixedAmenities: ['apple-picking'] },
@@ -357,7 +360,7 @@ export function backLabel(pillLabel) {
  
 // The same tag can read differently on one page. Checked before AMENITY_LABELS.
 export const PAGE_AMENITY_LABELS = {
-  'Halloween': { 'train-ride': '🚂 Halloween train rides' },
+  'Halloween': { 'train-ride': '🚂 Halloween train rides', 'trick-or-treat-street': '🍬 Trick or treat streets', 'self-guided-tour': '🗺 Self-guided tour' },
 }
 
 // Extract amenities from description field (for pumpkin patches with emoji badges)
@@ -464,3 +467,51 @@ const PIN_STYLES = {
 export function pinStyleFor(pillLabel) {
   return PIN_STYLES[pillLabel] || DEFAULT_PIN
 }
+
+// ---------------------------------------------------------------------------
+// Halloween map (Oct 27, 2026). Pins are keyed by the row's `map_kind` column
+// rather than by pill, so the three kinds share one map and a row's kind is a
+// Supabase edit, never a code change:
+//
+//   yard    🎃  a decorated private house (free, map only unless it also has
+//               a real listing)
+//   maze    😱  a haunted maze / walk-through, free or paid, always a listing
+//   street  🍬  a trick-or-treat street, drawn as a line from `map_path`
+//   rollup      the "Trick or Treat in <city>" card on the list; never a pin
+//
+// Colours are the brand palette: pumpkin, the maze purple, and amber.
+// ---------------------------------------------------------------------------
+export const MAP_KINDS = {
+  yard:   { color: '#C94F2C', selected: '#963A20', icon: '🎃', label: 'Yard Display' },
+  maze:   { color: '#5A2E8C', selected: '#3B1F5E', icon: '😱', label: 'Haunted Maze' },
+  street: { color: '#F0A03C', selected: '#B8761F', icon: '🍬', label: 'Trick or Treat' },
+}
+
+// Pin for one row: its map_kind when it has one, else the pill's pin.
+export function pinStyleForEvent(ev, pillLabel) {
+  return (ev && MAP_KINDS[ev.mapKind]) || pinStyleFor(pillLabel)
+}
+
+// "Haunted Maze / Free", "Yard Display", "Trick or Treat". Null when the row
+// has no map_kind, so ordinary cards show nothing new.
+export function mapKindLabel(ev) {
+  const k = ev && MAP_KINDS[ev.mapKind]
+  if (!k) return null
+  if (ev.mapKind === 'maze') return `${k.label} / ${ev.free ? 'Free' : 'Paid'}`
+  return k.label
+}
+
+// The nine city maps. Slug is what /halloween/<slug> links carry; `cities`
+// are the events.city values that belong on that map, so Tri-Valley can pool
+// three towns. Used only to turn a slug into a Near city, and back.
+export const HALLOWEEN_MAP_CITIES = [
+  { slug: 'san-jose',               name: 'San Jose',                 cities: ['San Jose'] },
+  { slug: 'sunnyvale',              name: 'Sunnyvale',                cities: ['Sunnyvale', 'Santa Clara'] },
+  { slug: 'redwood-city',           name: 'Redwood City',             cities: ['Redwood City'] },
+  { slug: 'san-francisco',          name: 'San Francisco',            cities: ['San Francisco'] },
+  { slug: 'tri-valley',             name: 'Tri-Valley',               cities: ['Livermore', 'Pleasanton', 'San Ramon', 'Dublin'] },
+  { slug: 'hayward',                name: 'Hayward',                  cities: ['Hayward', 'Fremont'] },
+  { slug: 'palo-alto',              name: 'Palo Alto',                cities: ['Palo Alto'] },
+  { slug: 'martinez-pleasant-hill', name: 'Martinez & Pleasant Hill', cities: ['Martinez', 'Pleasant Hill'] },
+  { slug: 'concord',                name: 'Concord',                  cities: ['Concord'] },
+]

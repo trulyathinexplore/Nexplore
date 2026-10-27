@@ -47,10 +47,13 @@ function viewSlug(label) {
 //
 // `map` is the one piece of view state that DOES travel, because a shared map
 // is a different thing from a shared list and the sharer chose it deliberately.
-export function viewUrl(pillLabel, isMap) {
+export function viewUrl(pillLabel, isMap, city = null) {
   const p = new URLSearchParams()
   if (pillLabel) p.set('view', slug(pillLabel))
   if (isMap) p.set('map', '1')
+  // A Halloween city map is the one shared view that carries its city: the
+  // recipient should land on Sunnyvale's map, not on all nine at once.
+  if (isMap && city) p.set('city', city)
   const qs = p.toString()
   return qs ? `${ORIGIN()}/?${qs}` : `${ORIGIN()}/`
 }
