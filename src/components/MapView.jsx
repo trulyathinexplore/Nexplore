@@ -104,7 +104,7 @@ function loadLeaflet() {
 // tour props thread straight into the pin card, which is the list's EventCard.
 // `legend` is an array of { icon, label } shown top-left; `overlay` is any
 // extra element rendered inside the canvas (the zip-radius control).
-export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, pin = pinStyleFor(null), hidePrice = false, contained = false, pinFor = null, tourIds = null, onTourToggle = null, tourFull = false, legend = null, overlay = null, focusId = null, circle = null }) {
+export default function MapView({ events, onSelect, onDirections, onClose, onShare, onShareView, onPinClick, theme, pin = pinStyleFor(null), hidePrice = false, contained = false, pinFor = null, tourIds = null, onTourToggle = null, tourFull = false, legend = null, overlay = null, focusId = null, circle = null, listButtonOffset = 22 }) {
   const pinOf = (ev) => (pinFor ? pinFor(ev) : pin)
   const holder = useRef(null)
   const mapRef = useRef(null)
@@ -311,7 +311,7 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
           <button
             onClick={onClose}
             style={{
-              position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 22, zIndex: 600,
+              position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: listButtonOffset, zIndex: 600,
               display: 'flex', alignItems: 'center', gap: 7, background: '#2D2D2D', color: 'white',
               border: '2.5px solid white', borderRadius: 50, padding: '13px 24px', fontSize: 14, fontWeight: 700,
               fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', boxShadow: '0 5px 18px rgba(0,0,0,0.3)',
@@ -349,6 +349,7 @@ export default function MapView({ events, onSelect, onDirections, onClose, onSha
                 tourChecked={!!tourIds && tourIds.has(selected.id)}
                 onTourToggle={onTourToggle}
                 tourFull={tourFull}
+                noPlaceholder
               />
             </div>
           </div>

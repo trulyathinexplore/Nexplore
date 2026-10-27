@@ -22,7 +22,7 @@ export const HALLOWEEN_PHOTO = '/media/halloween/filoli.jpg'
 export const CATEGORY_CIRCLES = [
   { pill: 'Playground', photo: '/media/home/playgrounds-sm.jpg', bg: 'linear-gradient(150deg,#9ac27d,#4f7d3a)' },
   { pill: 'Events', photo: '/media/home/events-sm.jpg', bg: 'linear-gradient(150deg,#2f8a63,#12583a)' },
-  { pill: 'Indoor Play', bg: 'linear-gradient(150deg,#f0a868,#c4622d)' },
+  { pill: 'Indoor Play', photo: '/media/home/indoor-play-sm.jpg', bg: 'linear-gradient(150deg,#f0a868,#c4622d)' },
   { pill: 'Pumpkin Patches', photo: '/media/pumpkin.jpg', bg: 'linear-gradient(150deg,#e8a15a,#b8561f)' },
   { pill: 'Halloween', photo: HALLOWEEN_PHOTO, bg: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
   { pill: 'Fruit Picking', photo: '/media/apple.jpg', bg: 'linear-gradient(150deg,#8fb56a,#4a7a2e)' },
@@ -321,7 +321,7 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
             // A city roll-up ("Palo Alto Home Haunt Tour", "Trick or Treat in
             // Palo Alto"): the whole card IS the map, so the button says so.
             // App.jsx routes a roll-up straight to that city's map.
-            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onLearnMore(ev) }}>🗺 Open the map</button>
+            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onLearnMore(ev) }}>Learn more</button>
           ) : (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onLearnMore(ev) }}>Learn more</button>
           )}
@@ -349,7 +349,7 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
           {pg ? (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onDirections(ev) }}>📍 Directions</button>
           ) : ev.mapKind === 'rollup' ? (
-            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); open() }}>🗺 Open the map</button>
+            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); open() }}>Learn more</button>
           ) : (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); open() }}>Learn more</button>
           )}

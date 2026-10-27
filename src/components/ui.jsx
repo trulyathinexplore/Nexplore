@@ -163,8 +163,13 @@ export function addToCalendar(event) {
 // Halloween map (Oct 27, 2026): when `onTourToggle` is passed the card grows
 // one checkbox row, "Add to tour", above its buttons. Nothing else about the
 // card changes, which is the point: the pin card on the map IS the list card.
-export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false, expanded = false, onToggleExpand = null, wide = false, tourChecked = false, onTourToggle = null, tourFull = false }) {
+export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick, theme = themeFor(null), hidePrice = false, expanded = false, onToggleExpand = null, wide = false, tourChecked = false, onTourToggle = null, tourFull = false, noPlaceholder = false }) {
   const canExpand = !!onToggleExpand
+  // Map pin cards (noPlaceholder): a row with no photo shows no image block at
+  // all, rather than the lettered placeholder tile the list uses. The FREE /
+  // Top pick badges and the share button move into a slim header row.
+  const hasPhoto = !!event.imageUrl || !!event.videoUrl
+  const imageless = noPlaceholder && !hasPhoto
   const kindLabel = mapKindLabel(event)
 
   // Is there anywhere worth sending someone? A missing url, a placeholder '#',
@@ -300,9 +305,20 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
       onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(32,26,18,0.06), 0 10px 22px rgba(32,26,18,0.12)' }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(32,26,18,0.05), 0 5px 14px rgba(32,26,18,0.07)' }}
     >
-      {/* Image — clicking image opens official URL */}
-      {/* With no link and nothing to expand, tapping the photo used to do
-          nothing at all. It goes to directions instead. */}
+      {imageless ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 10px 0 12px', minHeight: 30 }}>
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+            {!hidePrice && event.free && <div style={{ background: theme.freeBadgeBg, color: theme.freeBadgeFg, fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 5, boxShadow: theme.freeBadgeBg === 'white' ? '0 1px 4px rgba(0,0,0,0.2)' : 'none' }}>{freeLabel}</div>}
+            {isEditorPick && <div style={{ background: '#C94F2C', color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5 }}>✦ Top pick</div>}
+            {isClosingSoon && <div style={{ background: '#C94F2C', color: 'white', fontSize: 8, fontWeight: 700, padding: '3px 7px', borderRadius: 5 }}>CLOSING SOON</div>}
+          </div>
+          {onShare && (
+            <div onClick={(e) => { e.stopPropagation(); onShare(event) }} title="Share" style={{ width: 34, height: 34, borderRadius: '50%', background: 'white', border: '0.5px solid #E2DDD6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <ShareGlyph size={16} color="#2D2D2D" />
+            </div>
+          )}
+        </div>
+      ) : (
       <div
         style={{ position: 'relative', cursor: 'pointer' }}
         onClick={() => (directionsOnly ? onDirections && onDirections(event) : onSelect(event))}
@@ -362,6 +378,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
           </div>
         )}
       </div>
+      )}
 
       <div style={{ padding: '11px 12px 13px' }}>
             {dateRange && (
@@ -429,7 +446,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
                   onClick={(e) => { e.stopPropagation(); canExpand ? onToggleExpand(event) : onSelect(event) }}
                   style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: theme.learnBorder, background: theme.learnBg, textAlign: 'center', fontSize: 9.5, fontWeight: 600, color: theme.learnFg, cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
-                  {event.mapKind === 'rollup' ? '🗺 Open the map' : canExpand ? (expanded ? 'Close ▲' : 'Learn more ▾') : 'Learn more →'}
+                  {canExpand ? (expanded ? 'Close ▲' : 'Learn more ▾') : 'Learn more →'}
                 </div>
               )}
             </div>

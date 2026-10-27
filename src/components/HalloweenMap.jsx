@@ -5,7 +5,7 @@ import { useState } from 'react'
 //   TourBar       the green "Open route" bar that slides up once a stop is
 //                 checked. One Google Maps directions link with every stop as a
 //                 waypoint, in the order they were checked.
-//   ZipRadius     zip code + radius control drawn over the map. Applies the
+//   NearZipBar    one pill under the title: city, zip, radius. Applies the
 //                 moment the fifth digit lands; no Go button.
 //   tourRouteUrl  the Google Maps link. A street goes in as coordinates so
 //                 Maps lands on the block itself; everything else as its
@@ -78,24 +78,33 @@ export function TourBar({ stops, onOpen, onClear, max }) {
     c.street && `${c.street} 🍬`,
   ].filter(Boolean).join(' · ')
   const n = stops.length
+  const empty = n === 0
   return (
     <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 950, padding: '10px 16px calc(10px + env(safe-area-inset-bottom, 0px))', background: 'linear-gradient(to top, #F7F4EF 75%, transparent)', animation: 'fadeIn 0.22s ease' }}>
       <div style={{ maxWidth: 448, margin: '0 auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+        {/* Always on screen while the Halloween map is open, so people know
+            the tour exists before they have checked anything. Empty state is
+            the prompt; with stops it becomes the route button. */}
         <button
-          onClick={onOpen}
-          style={{ flex: 1, border: 0, background: '#1A6B4A', color: 'white', fontWeight: 700, fontSize: 15, padding: '13px 16px', borderRadius: 14, boxShadow: '0 4px 14px rgba(0,0,0,.18)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}
+          onClick={empty ? undefined : onOpen}
+          aria-disabled={empty}
+          style={{ flex: 1, border: 0, background: empty ? '#1A6B4A' : '#1A6B4A', color: 'white', fontWeight: 700, fontSize: empty ? 14 : 15, padding: '12px 16px', borderRadius: 14, boxShadow: '0 4px 14px rgba(0,0,0,.18)', cursor: empty ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: empty ? 'left' : 'center' }}
         >
-          Open route in Google Maps
-          <small style={{ display: 'block', fontWeight: 500, fontSize: 11.5, opacity: .85, marginTop: 1 }}>
-            {n} {n === 1 ? 'stop' : 'stops'}{mix ? ` · ${mix}` : ''}{n >= max ? ' · max' : ''} · from your location
+          {empty ? '🗺 Build your own Halloween drive' : 'Open route in Google Maps'}
+          <small style={{ display: 'block', fontWeight: 500, fontSize: 11.5, opacity: .9, marginTop: 2, lineHeight: 1.35 }}>
+            {empty
+              ? 'Tap any pin and check "Add to tour". Up to 9 stops, one route in Google Maps.'
+              : `${n} ${n === 1 ? 'stop' : 'stops'}${mix ? ` · ${mix}` : ''}${n >= max ? ' · max' : ''} · from your location`}
           </small>
         </button>
-        <button
-          onClick={onClear}
-          style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 700, padding: '12px 14px', borderRadius: 14, border: '0.5px solid #E2DDD6', background: 'white', color: '#2D2D2D', cursor: 'pointer' }}
-        >
-          Clear
-        </button>
+        {!empty && (
+          <button
+            onClick={onClear}
+            style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 700, padding: '12px 14px', borderRadius: 14, border: '0.5px solid #E2DDD6', background: 'white', color: '#2D2D2D', cursor: 'pointer' }}
+          >
+            Clear
+          </button>
+        )}
       </div>
     </div>
   )
@@ -103,18 +112,33 @@ export function TourBar({ stops, onOpen, onClear, max }) {
 
 const RADII = [5, 10, 15, 25]
 
-export function ZipRadius({ zip, onSearch, onClear }) {
+// The one-row control under the page title, matching the prototype: city
+// dropdown on the left, zip in the middle, radius on the right, one pill.
+// Mirrors the header's Near picker (same state), so either one works.
+export function NearZipBar({ city, cities, region, onCity, zip, onSearch, onClear, hiddenCount = 0 }) {
   const [code, setCode] = useState(zip.code || '')
   const [radius, setRadius] = useState(zip.radius || 10)
   const active = !!zip.center
+  const sel = { border: 0, background: 'transparent', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: '#2D2D2D', outline: 'none', height: '100%', minWidth: 0, appearance: 'none', WebkitAppearance: 'none' }
+  const cityValue = active ? '' : city
   return (
-    <div style={{ position: 'absolute', right: 10, top: 84, zIndex: 500, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-      <div style={{ display: 'flex', alignItems: 'stretch', height: 34, background: 'rgba(255,255,255,.96)', border: active ? '1.5px solid #1A6B4A' : '0.5px solid #E2DDD6', borderRadius: 999, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,.12)' }}>
+    <div style={{ margin: '0 16px 10px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1fr) auto', height: 40, border: '1.5px solid #1A6B4A', borderRadius: 999, background: 'white', overflow: 'hidden' }}>
+        <div style={{ position: 'relative', borderRight: '0.5px solid #E2DDD6', display: 'flex', alignItems: 'center' }}>
+          <span style={{ position: 'absolute', left: 11, fontSize: 13, pointerEvents: 'none' }}>📍</span>
+          <select id="nx-city" aria-label="Near" value={cityValue} onChange={(e) => onCity(e.target.value)} style={{ ...sel, width: '100%', padding: '0 22px 0 31px' }}>
+            <option value="">All Bay Area</option>
+            {region && <option value={`region:${region}`}>{region}</option>}
+            {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+            {city && !city.startsWith('region:') && !cities.includes(city) && <option value={city}>{city}</option>}
+          </select>
+          <span style={{ position: 'absolute', right: 10, fontSize: 10, color: '#2D2D2D', pointerEvents: 'none' }}>▼</span>
+        </div>
         <input
           value={code}
           inputMode="numeric"
           maxLength={5}
-          placeholder="Zip code"
+          placeholder="or zip code"
           aria-label="Zip code"
           onChange={(e) => {
             const v = e.target.value.replace(/\D/g, '').slice(0, 5)
@@ -122,22 +146,18 @@ export function ZipRadius({ zip, onSearch, onClear }) {
             if (v.length === 5) onSearch(v, radius)
             else if (!v.length && active) onClear()
           }}
-          style={{ width: 82, border: 0, background: 'transparent', padding: '0 10px', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#2D2D2D', outline: 'none', minWidth: 0 }}
+          style={{ border: 0, background: 'transparent', padding: '0 10px', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: '#2D2D2D', outline: 'none', minWidth: 0, width: '100%' }}
         />
-        <select
-          value={radius}
-          aria-label="Radius"
-          onChange={(e) => { const r = Number(e.target.value); setRadius(r); if (code.length === 5) onSearch(code, r) }}
-          style={{ border: 0, borderLeft: '0.5px solid #E2DDD6', background: active ? '#E8F5EE' : '#F7F4EF', color: active ? '#0F5238' : '#888880', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, padding: '0 6px', outline: 'none' }}
-        >
-          {RADII.map((r) => <option key={r} value={r}>{r} mi</option>)}
-        </select>
+        <div style={{ position: 'relative', borderLeft: '0.5px solid #E2DDD6', background: active ? '#E8F5EE' : '#F7F4EF', display: 'flex', alignItems: 'center' }}>
+          <select aria-label="Radius" value={radius} onChange={(e) => { const r = Number(e.target.value); setRadius(r); if (code.length === 5) onSearch(code, r) }} style={{ ...sel, width: 72, padding: '0 22px 0 9px', fontSize: 12.5, color: active ? '#0F5238' : '#888880' }}>
+            {RADII.map((r) => <option key={r} value={r}>{r} mi</option>)}
+          </select>
+          <span style={{ position: 'absolute', right: 9, fontSize: 10, color: active ? '#0F5238' : '#888880', pointerEvents: 'none' }}>▼</span>
+        </div>
       </div>
-      {zip.error && (
-        <div style={{ background: 'rgba(255,255,255,.96)', border: '0.5px solid #E2DDD6', borderRadius: 8, padding: '4px 8px', fontSize: 10.5, color: '#B3362A', maxWidth: 220, textAlign: 'right' }}>{zip.error}</div>
-      )}
-      {active && !zip.error && (
-        <div style={{ background: 'rgba(255,255,255,.96)', border: '0.5px solid #E2DDD6', borderRadius: 8, padding: '4px 8px', fontSize: 10.5, color: '#1A6B4A', fontWeight: 600 }}>Within {zip.radius} mi of {zip.code}</div>
+      {zip.error && <div style={{ fontSize: 11.5, color: '#B3362A', margin: '5px 4px 0' }}>{zip.error}</div>}
+      {active && !zip.error && hiddenCount > 0 && (
+        <div style={{ fontSize: 11.5, color: '#888880', margin: '5px 4px 0' }}>{hiddenCount} without a location aren't shown while a zip is set.</div>
       )}
     </div>
   )

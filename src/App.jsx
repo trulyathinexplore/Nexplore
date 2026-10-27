@@ -21,7 +21,7 @@ import {
   targets, copyLink, canNativeShare, nativeShare,
 } from './share.js'
 import MapView from './components/MapView.jsx'
-import { TourBar, ZipRadius, tourRouteUrl, tourCounts, milesBetween, geocodeZip } from './components/HalloweenMap.jsx'
+import { TourBar, NearZipBar, tourRouteUrl, tourCounts, milesBetween, geocodeZip } from './components/HalloweenMap.jsx'
 import {
   DayRibbon, Mosaic, SeasonCard, GROUPS, WIDE_CITIES, groupsOf, groupName, groupChips,
   collapseSeries, seasonPagesNow, onDay, dayTitle,
@@ -368,6 +368,7 @@ export default function App() {
     setBackToEvents(false)
     setShowMap(false)
     setOpenEventId(null)
+    setZip({ code: '', radius: 10, center: null, error: null })
     window.scrollTo(0, 0)
   }
 
@@ -439,6 +440,12 @@ export default function App() {
 
     // On Events, chain-store listings ("Bay Area") show under every city.
     if (city && (ev.city || '') !== city && !(isEventsPage && WIDE_CITIES.includes(ev.city)) && !onCityMap(ev, city)) return false
+    // A zip radius is on: only rows with a location inside it. Rows with no
+    // coordinates drop out (counted, and said so under the pill).
+    if (zip.center) {
+      if (typeof ev.lat !== 'number' || typeof ev.lng !== 'number') return false
+      if (milesBetween(zip.center, [ev.lat, ev.lng]) > zip.radius) return false
+    }
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
     if (nextWeekend && ev.startDate && !isNextWeekend(ev.startDate)) return false
     // NEW: Month filter based on selectedMonthFilter
@@ -525,10 +532,13 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
   const mapEnabled = MAP_ENABLED_PILLS.includes(activePill?.label)
   const isHalloween = activePill?.label === 'Halloween'
   const hasCoords = (ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number'
-  const inZip = (ev) => !zip.center || milesBetween(zip.center, [ev.lat, ev.lng]) <= zip.radius
   const mappable = mapEnabled
-    ? [...upcoming, ...mapOnlyUpcoming].filter((ev) => hasCoords(ev) && ev.mapKind !== 'rollup' && inZip(ev))
+    ? [...upcoming, ...mapOnlyUpcoming].filter((ev) => hasCoords(ev) && ev.mapKind !== 'rollup')
     : []
+  // How many rows the zip radius hid only because they have no coordinates.
+  const noLocationCount = zip.center
+    ? events.filter((ev) => matchesPill(ev, activePill) && (typeof ev.lat !== 'number' || typeof ev.lng !== 'number') && !ev.mapOnly).length
+    : 0
 
   // ---- Halloween tour ----------------------------------------------------
   const tourSet = new Set(tour)
@@ -557,7 +567,7 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
     if (!center) { setZip({ code, radius, center: null, error: `Couldn't find ${code}. Try a Bay Area zip.` }); trackZipSearch(code, radius, 0); return }
     setCity(null)
     setZip({ code, radius, center, error: null })
-    const n = [...upcoming, ...mapOnlyUpcoming].filter((ev) => hasCoords(ev) && milesBetween(center, [ev.lat, ev.lng]) <= radius).length
+    const n = events.filter((ev) => matchesPill(ev, activePill) && hasCoords(ev) && milesBetween(center, [ev.lat, ev.lng]) <= radius).length
     trackZipSearch(code, radius, n)
   }
   const clearZip = () => setZip({ code: '', radius: 10, center: null, error: null })
@@ -866,7 +876,7 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
 
   const pageSubtitle = loading ? 'Loading...' : (() => {
     const t = countLabel(pill, isEventsPage && dayPick ? dayList.length : upcoming.length)
-    return t.charAt(0).toUpperCase() + t.slice(1) + (city ? ` in ${city}` : '')
+    return t.charAt(0).toUpperCase() + t.slice(1) + (zip.center ? ` within ${zip.radius} mi of ${zip.code}` : city ? ` in ${city}` : '')
   })()
 
   return (
@@ -876,17 +886,9 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
         <button className="nx-brand" onClick={goHome} aria-label="Nexplore home">
           <span style={{ color: '#1A6B4A' }}>Ne</span><span style={{ color: '#C94F2C' }}>x</span><span style={{ color: '#1A6B4A' }}>plore</span>
         </button>
-        <label className="nx-near" htmlFor="nx-city">Near
-          {/* Old shared links may carry ?region=South Bay etc. Keep honoring
-              them and show the region here, so it can be seen and cleared. */}
-          <select id="nx-city" value={region && !city ? `region:${region}` : (city || '')} onChange={(e) => { const v = e.target.value; setRegion(v.startsWith('region:') ? v.slice(7) : null); setCity(v && !v.startsWith('region:') ? v : null) }}>
-            <option value="">All Bay Area</option>
-            {region && <option value={`region:${region}`}>{region}</option>}
-            {(isHalloween ? HALLOWEEN_MAP_CITIES.map((c) => c.name) : cityOptions).map((c) => <option key={c} value={c}>{c}</option>)}
-            {city && !cityOptions.includes(city) && !HALLOWEEN_MAP_CITIES.some((c) => c.name === city) && <option value={city}>{city}</option>}
-          </select>
-        </label>
       </div>
+
+
 
       {/* Category circles replace the old pill row on every page. */}
       <CategoryRow active={pill} onPick={choosePill} />
@@ -934,7 +936,9 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
             showMap={!loading && mappable.length > 0}
             mapOn={showMap}
             onMap={() => (showMap ? setShowMap(false) : openMap('header_toggle'))}
-            onShare={!loading && upcoming.length > 0 ? (showMap ? shareMap : shareView) : null}
+            // Page-level share removed (Oct 27, 2026): share lives on each card
+            // and on the map pin card. shareView / shareMap stay for links.
+            onShare={null}
           />
           </div>
 
@@ -949,6 +953,20 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
             </div>
           )}
 
+          {/* The Near row (Oct 27, 2026): one pill on EVERY page, list and map:
+              city on the left, zip code in the middle, radius on the right.
+              Replaces the Near picker that used to sit in the header. */}
+          <NearZipBar
+            city={region && !city ? `region:${region}` : (city || '')}
+            cities={isHalloween ? HALLOWEEN_MAP_CITIES.map((c) => c.name) : cityOptions}
+            region={region}
+            onCity={(v) => { setRegion(v.startsWith('region:') ? v.slice(7) : null); setCity(v && !v.startsWith('region:') ? v : null); clearZip(); setFocusId(null) }}
+            zip={zip}
+            onSearch={runZip}
+            onClear={clearZip}
+            hiddenCount={zip.center ? noLocationCount : 0}
+          />
+
           {showMap ? (
             // The map sits inside the page: everything above stays put and
             // only the listing area swaps out.
@@ -960,8 +978,8 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
                 pin={pinStyleFor(activePill?.label)}
                 pinFor={isHalloween ? (ev) => pinStyleForEvent(ev, pill) : null}
                 legend={isHalloween ? Object.values(MAP_KINDS).map((k) => ({ icon: k.icon, label: k.label })) : null}
-                overlay={isHalloween ? <ZipRadius zip={zip} onSearch={runZip} onClear={clearZip} /> : null}
                 circle={zip.center ? { center: zip.center, miles: zip.radius } : null}
+                listButtonOffset={isHalloween ? 22 : 22}
                 tourIds={isHalloween ? tourSet : null}
                 onTourToggle={isHalloween ? (ev, on) => toggleTour(ev, on, 'pin_card') : null}
                 tourFull={tourFull}
@@ -1144,8 +1162,9 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
         tourFull={tourFull}
       />
 
-      {/* The Halloween tour bar: slides up once a stop is checked. */}
-      {isHalloween && tourEvents.length > 0 && !openEvent && !shareTarget && (
+      {/* The Halloween tour bar: always there while the map is open (as a
+          prompt), and anywhere on the pill once a stop has been checked. */}
+      {isHalloween && (showMap || tourEvents.length > 0) && !openEvent && !shareTarget && (
         <TourBar stops={tourEvents} onOpen={openTourRoute} onClear={clearTour} max={MAX_TOUR_STOPS} />
       )}
 
