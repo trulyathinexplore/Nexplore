@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Palo Alto Halloween Houses 2026 | Nexplore</title>
+<meta name="description" content="Decorated Halloween houses in Palo Alto, pinned on one map.">
+<link rel="canonical" href="https://nexplore.us/halloween/palo-alto">
+<meta name="theme-color" content="#F7F4EF">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Palo Alto Halloween Houses 2026">
+<meta property="og:description" content="Decorated Halloween houses in Palo Alto, pinned on one map.">
+<meta property="og:url" content="https://nexplore.us/halloween/palo-alto">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  :root{
+    --ink:#2D2D2D; --green:#1A6B4A; --green-dark:#0F5238; --pumpkin:#C94F2C; --amber:#F0A03C;
+    --sand:#F7F4EF; --card:#ffffff; --line:#E2DDD6; --muted:#888880;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#F3EFE8; --sand:#14120F; --card:#1E1B17; --line:#2E2A24; --muted:#A39E95; --green:#2E9B6E; --green-dark:#1A6B4A;
+    }
+  }
+  :root[data-theme="dark"]{ --ink:#F3EFE8; --sand:#14120F; --card:#1E1B17; --line:#2E2A24; --muted:#A39E95; --green:#2E9B6E; --green-dark:#1A6B4A; }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0}
+  body{background:var(--sand); color:var(--ink); font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; line-height:1.4}
+  .wrap{max-width:560px; margin:0 auto; padding:14px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+  .top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px}
+  .brand{font-family:'Playfair Display',Georgia,serif; font-weight:800; font-size:18px; letter-spacing:-.3px; text-decoration:none; color:var(--green)}
+  .brand b{color:var(--pumpkin)}
+  .back{font-size:13px; font-weight:600; color:var(--muted); text-decoration:none}
+  .back:hover{color:var(--ink)}
+  h1{font-family:'Playfair Display',Georgia,serif; font-weight:800; font-size:clamp(24px,6.5vw,30px); line-height:1.1; letter-spacing:-.6px; margin:10px 0 12px}
+  .facts{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px}
+  .chip{font-size:12px; font-weight:600; padding:5px 10px; border-radius:999px; background:var(--card); border:1px solid var(--line); color:var(--ink)}
+  .chip.free{background:var(--green); border-color:var(--green); color:#fff}
+  .cities{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px}
+  .cities a{font-size:13px; font-weight:600; padding:7px 12px; border-radius:999px; text-decoration:none; color:var(--ink); background:var(--card); border:1px solid var(--line)}
+  .cities a.on{background:var(--pumpkin); border-color:var(--pumpkin); color:#fff}
+  .mapcard{position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--line); background:var(--card); box-shadow:0 4px 18px rgba(0,0,0,.08)}
+  #map{height:min(44vh,380px); min-height:260px; width:100%; background:#e9e5de}
+  .mapbar{position:absolute; top:10px; right:10px; z-index:500}
+  .mapbtn{font:inherit; font-size:12.5px; font-weight:700; padding:7px 11px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  .leaflet-container{font-family:inherit}
+  .leaflet-popup-content-wrapper{border-radius:12px; background:var(--card); color:var(--ink); box-shadow:0 6px 20px rgba(0,0,0,.18)}
+  .leaflet-popup-tip{background:var(--card)}
+  .leaflet-popup-content{margin:10px 14px; font-size:14px; line-height:1.35}
+  .leaflet-popup-content b{display:block; font-size:15px}
+  .leaflet-popup-content .n{color:var(--muted); font-size:12.5px; margin-top:2px}
+  .leaflet-popup-content .pp{display:flex; align-items:center; gap:8px; margin-top:8px; font-weight:700; font-size:13.5px; cursor:pointer}
+  .leaflet-popup-content .pp input{width:20px; height:20px; margin:0; accent-color:var(--green)}
+  .leaflet-popup-content a{display:inline-block; margin-top:6px; font-size:12.5px; font-weight:700; color:var(--green); text-decoration:none}
+  .leaflet-control-attribution{font-size:9px}
+  .pin{filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+  .pin .bubble{width:30px; height:30px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:var(--pumpkin); border:2px solid #fff; display:grid; place-items:center}
+  .pin .bubble i{width:10px; height:10px; border-radius:50%; background:#fff; display:block}
+  .pin.on .bubble{background:var(--green-dark); width:36px; height:36px}
+  .pin.picked .bubble{background:var(--green)}
+  .pin.picked .bubble i{background:#fff; width:12px; height:12px}
+  section.list{margin-top:18px}
+  h2{font-family:'Playfair Display',Georgia,serif; font-weight:700; font-size:17px; margin:18px 0 8px; letter-spacing:-.2px}
+  h2 small{font-family:'DM Sans',sans-serif; font-weight:600; font-size:12px; color:var(--muted); margin-left:6px}
+  ol{list-style:none; margin:0; padding:0; display:grid; gap:6px}
+  .row{display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; width:100%; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:8px 8px 8px 12px; color:var(--ink)}
+  .row.on{border-color:var(--green); box-shadow:inset 0 0 0 1px var(--green)}
+  .row.picked{background:color-mix(in srgb, var(--green) 10%, var(--card))}
+  .row label{display:contents; cursor:pointer}
+  .row input{width:22px; height:22px; margin:0; accent-color:var(--green); cursor:pointer; flex:none}
+  .row .body{min-width:0; padding:4px 0; cursor:pointer}
+  .row .t{font-weight:700; font-size:14.5px; min-width:0}
+  .row .s{font-size:12.5px; color:var(--muted); margin-top:1px; min-width:0}
+  .row .go{font:inherit; font-size:12.5px; font-weight:700; padding:8px 11px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--green); cursor:pointer; white-space:nowrap}
+  .row .go:focus-visible, .row input:focus-visible{outline:2px solid var(--green); outline-offset:2px}
+  .routebar{position:fixed; left:0; right:0; bottom:0; z-index:900; padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px)); background:linear-gradient(to top, var(--sand) 75%, transparent); transform:translateY(110%); transition:transform .25s ease}
+  .routebar.show{transform:none}
+  .routebar .inner{max-width:528px; margin:0 auto; display:flex; gap:8px; align-items:center}
+  .routebar a{flex:1; text-align:center; text-decoration:none; background:var(--green); color:#fff; font-weight:700; font-size:15.5px; padding:14px 16px; border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,.18)}
+  .routebar a small{display:block; font-weight:500; font-size:11.5px; opacity:.85; margin-top:1px}
+  .routebar button{font:inherit; font-size:13px; font-weight:700; padding:12px 14px; border-radius:14px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer}
+  .tour{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; margin:0 0 12px; padding:14px 16px; border-radius:16px; background:var(--green); color:#fff; box-shadow:0 4px 18px rgba(26,107,74,.25)}
+  .tour h3{font-family:'Playfair Display',Georgia,serif; font-weight:700; font-size:17px; margin:0 0 3px; letter-spacing:-.2px; line-height:1.15}
+  .tour p{margin:0; font-size:13px; line-height:1.4; opacity:.92}
+  .tour a{flex:none; text-decoration:none; background:#fff; color:var(--green-dark); font-weight:700; font-size:13.5px; padding:10px 14px; border-radius:999px; white-space:nowrap}
+  @media (max-width:380px){ .tour{grid-template-columns:1fr} .tour a{justify-self:start} }
+  .listhead{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-top:20px}
+  .listhead h2{margin:0; font-size:19px}
+  .listhead span{font-size:12.5px; color:var(--muted)}
+  body.haspick .wrap{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .note{font-size:12.5px; color:var(--muted); line-height:1.5; margin-top:16px}
+  .foot{margin-top:18px; font-size:12px; color:var(--muted); text-align:center}
+  .foot a{color:var(--green); font-weight:600; text-decoration:none}
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="brand" href="https://nexplore.us/">Nex<b>plore</b></a>
+    <a class="back" href="https://nexplore.us/?view=halloween">← All Halloween</a>
+  </div>
+
+  <h1>Palo Alto Halloween Houses 2026</h1>
+  <nav class="cities" aria-label="City">
+    <a href="/halloween/san-jose">San Jose</a><a href="/halloween/sunnyvale">Sunnyvale</a><a href="/halloween/redwood-city">Redwood City</a><a href="/halloween/san-francisco">San Francisco</a><a href="/halloween/tri-valley">Tri-Valley</a><a href="/halloween/hayward">Hayward</a><a class="on" aria-current="page" href="/halloween/palo-alto">Palo Alto</a><a href="/halloween/martinez-pleasant-hill">Martinez & Pleasant Hill</a><a href="/halloween/concord">Concord</a>
+  </nav>
+
+  <div class="tour">
+    <div>
+      <h3>Build your own tour</h3>
+      <p>Pick your spots. Get one route in Google Maps.</p>
+    </div>
+    <a href="#houses" id="pickCta">Start ↓</a>
+  </div>
+
+  <div class="mapcard">
+    <div id="map" role="region" aria-label="Map of Palo Alto with numbered Halloween house pins"></div>
+    <div class="mapbar"><button class="mapbtn" id="showAll" type="button">Show all</button></div>
+  </div>
+
+  <div class="listhead" id="houses"><h2>Pick your spots</h2><span>Up to 9</span></div>
+  <section class="list" aria-label="Houses">
+    <h2>Downtown &amp; University South<small>2 houses</small></h2><ol>
+<li><div class="row" id="row0"><input type="checkbox" id="pick0" aria-label="Add 115 Waverley St to route"><div class="body"><div class="t">115 Waverley St</div><div class="s">Skeleton House</div></div><button class="go" type="button" aria-label="Show 115 Waverley St on map">Show on map</button></div></li>
+<li><div class="row" id="row1"><input type="checkbox" id="pick1" aria-label="Add 559 Addison Ave to route"><div class="body"><div class="t">559 Addison Ave</div><div class="s">Giant pumpkin</div></div><button class="go" type="button" aria-label="Show 559 Addison Ave on map">Show on map</button></div></li>
+</ol>
+<h2>South Palo Alto<small>1 house</small></h2><ol>
+<li><div class="row" id="row2"><input type="checkbox" id="pick2" aria-label="Add 2625 Waverley St to route"><div class="body"><div class="t">2625 Waverley St</div><div class="s">Haunted house</div></div><button class="go" type="button" aria-label="Show 2625 Waverley St on map">Show on map</button></div></li>
+</ol>
+  </section>
+
+  <p class="note">These are private homes. Park on the street, keep sidewalks and driveways clear, and be kind to the neighbors. Displays can change without notice. Know a house that's missing? Message <a href="https://www.instagram.com/trulyathi/" style="color:var(--green);font-weight:600;text-decoration:none">@trulyathi</a>.</p>
+  <p class="foot">Part of <a href="https://nexplore.us/?view=halloween">Halloween on Nexplore</a> · Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors</p>
+</div>
+
+<div class="routebar" id="routebar" aria-live="polite">
+  <div class="inner">
+    <a id="routeBtn" href="#" target="_blank" rel="noopener">Open route<small id="routeSub"></small></a>
+    <button type="button" id="clearBtn">Clear</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const HOUSES = [{"a": "115 Waverley St", "lat": 37.4504055, "lng": -122.1654717, "e": "", "n": "Skeleton House", "city": "Palo Alto"}, {"a": "559 Addison Ave", "lat": 37.4451122, "lng": -122.1523297, "e": "", "n": "Giant pumpkin", "city": "Palo Alto"}, {"a": "2625 Waverley St", "lat": 37.4303382, "lng": -122.1336382, "e": "", "n": "Haunted house", "city": "Palo Alto"}];
+const map = L.map('map', { scrollWheelZoom: false, tap: true });
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+const picked = new Set();
+const MAX_STOPS = 9;
+function icon(h, i, on) {
+  return L.divIcon({
+    className: 'pin' + (on ? ' on' : '') + (picked.has(i) ? ' picked' : ''),
+    html: '<div class="bubble"><i></i></div>',
+    iconSize: on ? [36, 36] : [30, 30],
+    iconAnchor: on ? [18, 36] : [15, 30],
+    popupAnchor: [0, on ? -36 : -30]
+  });
+}
+function mapsLink(h) {
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(h.a + ', ' + (h.city || 'Palo Alto') + ', CA');
+}
+const markers = HOUSES.map((h, i) => {
+  const m = L.marker([h.lat, h.lng], { icon: icon(h, i, false), title: h.a, riseOnHover: true }).addTo(map);
+  m.bindPopup(() => '<b>' + h.a + '</b>' + (h.n ? '<div class="n">' + h.n + '</div>' : '') +
+    '<label class="pp"><input type="checkbox" data-i="' + i + '"' + (picked.has(i) ? ' checked' : '') + (boxes[i] && boxes[i].disabled ? ' disabled' : '') + '> Add to tour</label>' +
+    '<a href="' + mapsLink(h) + '" target="_blank" rel="noopener">Open in Google Maps ↗</a>');
+  m.on('click', () => select(i, false));
+  return m;
+});
+const rows = HOUSES.map((h, i) => document.getElementById('row' + i));
+let current = -1;
+function select(i, zoom) {
+  if (current >= 0) { markers[current].setIcon(icon(HOUSES[current], current, false)); rows[current].classList.remove('on'); }
+  current = i;
+  markers[i].setIcon(icon(HOUSES[i], i, true)); markers[i].setZIndexOffset(1000);
+  rows[i].classList.add('on');
+  if (zoom) { map.flyTo([HOUSES[i].lat, HOUSES[i].lng], Math.max(map.getZoom(), 16), { duration: .6 }); markers[i].openPopup(); }
+}
+const boxes = HOUSES.map((h, i) => document.getElementById('pick' + i));
+rows.forEach((r, i) => {
+  r.querySelector('.go').addEventListener('click', () => { select(i, true); document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  r.querySelector('.body').addEventListener('click', () => { boxes[i].checked = !boxes[i].checked; onPick(i); });
+  boxes[i].addEventListener('change', () => onPick(i));
+});
+function onPick(i) {
+  if (boxes[i].checked) picked.add(i); else picked.delete(i);
+  rows[i].classList.toggle('picked', boxes[i].checked);
+  markers[i].setIcon(icon(HOUSES[i], i, i === current));
+  updateRoute();
+}
+function updateRoute() {
+  const n = picked.size;
+  const full = n >= MAX_STOPS;
+  boxes.forEach((b, i) => { b.disabled = full && !picked.has(i); rows[i].style.opacity = b.disabled ? .55 : 1; });
+  const bar = document.getElementById('routebar');
+  document.body.classList.toggle('haspick', n > 0);
+  bar.classList.toggle('show', n > 0);
+  if (!n) return;
+  // Keep list order (grouped by neighborhood) so the route doesn't zigzag.
+  const stops = [...picked].sort((a, b) => a - b).map(i => HOUSES[i].a + ', ' + (HOUSES[i].city || 'Palo Alto') + ', CA');
+  const url = 'https://www.google.com/maps/dir/?api=1&travelmode=driving'
+    + '&destination=' + encodeURIComponent(stops[stops.length - 1])
+    + (stops.length > 1 ? '&waypoints=' + encodeURIComponent(stops.slice(0, -1).join('|')) : '');
+  document.getElementById('routeBtn').href = url;
+  document.getElementById('routeSub').textContent = n + (n === 1 ? ' spot' : ' spots') + (full ? ' · max' : '') + ' · from your location';
+}
+map.on('popupopen', e => {
+  const cb = e.popup.getElement().querySelector('input[data-i]');
+  if (cb) cb.addEventListener('change', () => { const i = +cb.dataset.i; boxes[i].checked = cb.checked; onPick(i); });
+});
+document.getElementById('pickCta').addEventListener('click', e => { e.preventDefault(); document.getElementById('houses').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+document.getElementById('clearBtn').addEventListener('click', () => { picked.clear(); boxes.forEach(b => b.checked = false); rows.forEach(r => r.classList.remove('picked')); markers.forEach((m, i) => m.setIcon(icon(HOUSES[i], i, i === current))); updateRoute(); });
+const bounds = L.latLngBounds(HOUSES.map(h => [h.lat, h.lng]));
+function fitAll() { map.fitBounds(bounds, { padding: [34, 34] }); }
+document.getElementById('showAll').addEventListener('click', () => { map.closePopup(); fitAll(); });
+fitAll();
+</script>
+</body>
+</html>

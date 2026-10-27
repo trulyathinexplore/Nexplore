@@ -21,6 +21,53 @@
   to = "/fall.html"
   status = 200
 
+# Clean URLs for the Halloween house map pages (one static page per city).
+# Same rule as /fall: these MUST stay above the /* catch-all.
+[[redirects]]
+  from = "/halloween/sunnyvale"
+  to = "/halloween/sunnyvale.html"
+  status = 200
+
+[[redirects]]
+  from = "/halloween/san-jose"
+  to = "/halloween/san-jose.html"
+  status = 200
+
+[[redirects]]
+  from = "/halloween/redwood-city"
+  to = "/halloween/redwood-city.html"
+  status = 200
+
+[[redirects]]
+  from = "/halloween/san-francisco"
+  to = "/halloween/san-francisco.html"
+  status = 200
+
+[[redirects]]
+  from = "/halloween/palo-alto"
+  to = "/halloween/palo-alto.html"
+  status = 200
+
+[[redirects]]
+  from = "/halloween/martinez-pleasant-hill"
+  to = "/halloween/martinez-pleasant-hill.html"
+  status = 200
+
+[[redirects]]
+  from = "/halloween/concord"
+  to = "/halloween/concord.html"
+  status = 200
+
+[[redirects]]
+  from = "/halloween/tri-valley"
+  to = "/halloween/tri-valley.html"
+  status = 200
+
+[[redirects]]
+  from = "/halloween/hayward"
+  to = "/halloween/hayward.html"
+  status = 200
+
 # Shareable filter-state URLs: serve the SPA for any path so deep links work
 [[redirects]]
   from = "/*"
