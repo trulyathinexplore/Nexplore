@@ -45,9 +45,13 @@ export async function geocodeZip(code) {
   return zipCache[code]
 }
 
+// Address only, never the title: a decorated house has no Google listing, and
+// "Harry Potter House Sunnyvale, 587 Sunnymount Ave" sent Maps looking for a
+// business. A street, or a row with no street address, goes as coordinates.
 function stopQuery(ev) {
   if (ev.mapKind === 'street') return `${ev.lat},${ev.lng}`
-  return ev.fullAddress ? `${ev.title}, ${ev.fullAddress}` : `${ev.lat},${ev.lng}`
+  const hasStreetAddress = !!ev.fullAddress && /\d/.test(ev.fullAddress)
+  return hasStreetAddress ? ev.fullAddress : `${ev.lat},${ev.lng}`
 }
 
 export function tourRouteUrl(stops) {
