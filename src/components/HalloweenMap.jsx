@@ -74,7 +74,7 @@ export function tourCounts(stops) {
   return c
 }
 
-export function TourBar({ stops, onOpen, onClear, max }) {
+export function TourBar({ stops, onOpen, onClear, max, noun = 'Halloween' }) {
   const c = tourCounts(stops)
   const mix = [
     c.yard && `${c.yard} 🎃`,
@@ -94,7 +94,7 @@ export function TourBar({ stops, onOpen, onClear, max }) {
           aria-disabled={empty}
           style={{ flex: 1, border: 0, background: empty ? '#1A6B4A' : '#1A6B4A', color: 'white', fontWeight: 700, fontSize: empty ? 14 : 15, padding: '12px 16px', borderRadius: 14, boxShadow: '0 4px 14px rgba(0,0,0,.18)', cursor: empty ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: empty ? 'left' : 'center' }}
         >
-          {empty ? '🗺 Build your own Halloween drive' : 'Open route in Google Maps'}
+          {empty ? `🗺 Build your own ${noun} drive` : 'Open route in Google Maps'}
           <small style={{ display: 'block', fontWeight: 500, fontSize: 11.5, opacity: .9, marginTop: 2, lineHeight: 1.35 }}>
             {empty
               ? 'Tap any pin and check "Add to tour". Up to 9 stops, one route in Google Maps.'

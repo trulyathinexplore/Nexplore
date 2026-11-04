@@ -1,7 +1,7 @@
 import { useState, useLayoutEffect, useRef } from 'react'
 import { EventImage, ShareGlyph, sizedImageUrl } from './ui.jsx'
 import { seasonState } from '../season.js'
-import { themeFor, badgesFor, badgeLabel, pillForEvent } from '../constants.js'
+import { PILLS, themeFor, badgesFor, badgeLabel, pillForEvent } from '../constants.js'
 
 // ---------------------------------------------------------------------------
 // Explore redesign (Sep 2026). One template for every list page:
@@ -46,7 +46,7 @@ export function featureLabel(pill) {
 export function CategoryRow({ active, onPick }) {
   return (
     <div className="nx-cats" role="navigation" aria-label="Explore categories">
-      {CATEGORY_CIRCLES.map((c) => {
+      {CATEGORY_CIRCLES.filter((c) => !PILLS.find((p) => p.label === c.pill)?.hidden).map((c) => {
         const on = active === c.pill
         return (
           <button key={c.pill} className={`nx-cat${on ? ' on' : ''}`} onClick={() => onPick(c.pill)} aria-current={on ? 'page' : undefined}>
@@ -332,29 +332,70 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
 }
 
 // ---- Listing card (Amazon style) -----------------------------------------
+// Status badges as a row above the title (Nov 3, 2026, RAG's call): Free /
+// Free admission, Top pick, Newly opened, then the season state. Same slot on
+// every card whether or not it has a photo, so titles line up down the list.
+function StatusRow({ ev, hidePrice, page }) {
+  const showFree = !hidePrice && ev.free && ev.category !== 'Playground'
+  const showNew = ev.category === 'Playground' && ev.newlyOpened
+  const status = statusLine(ev)
+  const items = []
+  if (showNew) items.push(['new', 'Newly opened', '#1A6B4A'])
+  if (showFree) items.push(['free', freeLabel(ev, page), '#1A6B4A'])
+  if (ev.isEditorPick) items.push(['pick', '✦ Top pick', '#C94F2C'])
+  if (status) items.push(['status', status.text, status.cls === 'closed' ? '#2D2D2D' : '#C94F2C'])
+  if (!items.length) return null
+  return (
+    <div className="nx-statusrow">
+      {items.map(([k, label, bg]) => <span key={k} className="nx-ob" style={{ background: bg, color: '#fff' }}>{label}</span>)}
+    </div>
+  )
+}
+
+// The list card (Nov 3, 2026 redesign, "option F"). Text first: status
+// badges, title, date, city, chips, then Learn more at the foot of the text
+// column. The photo (or reel) fills the right side edge to edge when there is
+// one; without one the text takes the full width and nothing stands in for the
+// picture. No price on the card: the Free badge says what matters and the
+// sheet has the rest. Reels: the play dot sits on the photo and opens the
+// sheet with the video playing; the rest of the card opens the sheet as usual.
 export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hidePrice, page, theme = themeFor(null), extraChips }) {
   const pg = isPlayground(ev)
   const open = () => (pg ? (hasOfficial(ev) ? onOfficial(ev) : onDirections(ev)) : onToggle(ev, false))
-  const H4 = ({ children }) => <h4>{children}</h4>
+  const hasPhoto = !!ev.imageUrl || pg // playgrounds always have a placeholder photo
+  const range = openCloseLabel(ev)
+  const season = seasonState(ev)
+  const closed = season.state === 'closed'
   return (
-    <article className="nx-small" onClick={open}>
-      <div className="nx-thumb">
-        <EventImage event={ev} height={'100%'} />
-        <PhotoBadges ev={ev} hidePrice={hidePrice} theme={theme} page={page} />
-        {ev.videoUrl && <PlayBadge right onClick={() => onToggle(ev, true)} />}
-      </div>
-      <div className="nx-smallbody">
-        <CardText ev={ev} hidePrice={hidePrice} onShare={onShare} Title={H4} extraChips={extraChips} page={page} onMore={(x) => onToggle(x, false)} />
-        <div className="nx-actions">
+    <article className={`nx-row${hasPhoto ? ' has-photo' : ''}${closed ? ' closed' : ''}`} onClick={open}>
+      <div className="nx-rowbody">
+        <StatusRow ev={ev} hidePrice={hidePrice} page={page} />
+        <div className="nx-titlerow">
+          <h4>{ev.title}</h4>
+          <ShareBtn small onClick={() => onShare(ev)} />
+        </div>
+        {range && <div className="nx-when">{range}</div>}
+        <div className="nx-meta">{ev.city || ev.area}</div>
+        {pg ? <AmenityChips ev={ev} /> : <EventChips ev={ev} extra={extraChips} />}
+        {!pg && <CardBadges ev={ev} page={page} onMore={(x) => onToggle(x, false)} />}
+        <div className="nx-rowactions">
           {pg ? (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onDirections(ev) }}>📍 Directions</button>
-          ) : ev.mapKind === 'rollup' ? (
-            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); open() }}>Learn more</button>
           ) : (
-            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); open() }}>Learn more</button>
+            <button className={`nx-btn${closed ? ' more' : ' solid'}`} onClick={(e) => { e.stopPropagation(); open() }}>Learn more</button>
           )}
         </div>
       </div>
+      {hasPhoto && (
+        <div className="nx-rowphoto">
+          <EventImage event={ev} height={'100%'} />
+          {ev.videoUrl && (
+            <button className="nx-rowplay" onClick={(e) => { e.stopPropagation(); onToggle(ev, true) }} aria-label="Watch video">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
+            </button>
+          )}
+        </div>
+      )}
     </article>
   )
 }
