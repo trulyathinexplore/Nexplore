@@ -30,6 +30,7 @@ export const PILLS = [
     label: 'Pumpkin Patches',
     type: 'category',
     value: 14,
+    hidden: true, // season over (RAG, 2026-11-03). Delete to bring back in September.
     // 'free-admission' rather than 'free', and only on this pill. A patch can be
     // free to walk into while its hayrides, corn maze and rides all cost money,
     // so 'free' overpromises here. 'free' stays the special case in App.jsx that
@@ -42,6 +43,7 @@ export const PILLS = [
     label: 'Halloween',
     type: 'seasonalType',
     value: 'halloween',
+    hidden: true, // season over (RAG, 2026-11-03). Delete to bring back in September.
     expandable: true,
     // A chosen set, replacing the scraped one that produced "Light
     // installations" and "Night event". The order is deliberate: the first two
@@ -62,6 +64,7 @@ export const PILLS = [
     fixedAmenities: ['no-spooks', 'free', 'family-friendly', 'haunted-maze', 'home-display', 'train-ride', 'trick-or-treat-street'],
   },
   { label: 'Fruit Picking',  type: 'category', value: 17,
+    hidden: true, // season over (RAG, 2026-11-03). Delete to bring back in late summer.
     fixedAmenities: ['apple-picking'] },
   { label: 'Holiday Events', type: 'category', value: 16, expandable: true,
     // Trains is `train-ride` and Ice rink is `ice-skating`; drive-through and
@@ -71,8 +74,12 @@ export const PILLS = [
     // Seven is on the long side for a row that scrolls sideways on a phone.
     // The first three fit without scrolling, so Free, Home display and Drive
     // through lead deliberately: they are the ones that narrow the list most.
-    fixedAmenities: ['free', 'home-display', 'drive-through', 'train-ride',
-                     'ice-skating', 'christmas-village', 'santa-photos'] },
+    // 'holiday-show' added 2026-11-03 for Nutcracker, puppet shows, holiday
+    // concerts and the like; tag rows with it in event_tags.
+    // Order set by RAG 2026-11-03: Free, Ice rink, Christmas village, Santa
+    // photos, Trains, Drive through, Yard displays, Holiday shows.
+    fixedAmenities: ['free', 'ice-skating', 'christmas-village', 'santa-photos',
+                     'train-ride', 'drive-through', 'home-display', 'holiday-show'] },
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair', hidden: true },
   { label: 'Zoo & Aquarium', type: 'category', value: ['Zoo', 'Aquarium']},
   { label: 'Museum',        type: 'category',  value: 'Museum' },
@@ -282,6 +289,7 @@ export const AMENITY_LABELS = {
   'santa-photos': '🎅 Santa photos',
   'train-ride': '🚂 Trains',
   'ice-skating': '⛸ Ice rink',
+  'holiday-show': '🎭 Holiday shows',
   'christmas-village': '🎄 Christmas village',
   'free-admission': 'Free admission',
   // Indoor Play kinds (chips)
@@ -462,6 +470,7 @@ const PIN_STYLES = {
   'County Fairs':    { color: '#D0487A', selected: '#A03259', icon: '🎡' },
   'Events':          { color: '#1A6B4A', selected: '#124D35', icon: '📅' },
   'Indoor Play':     { color: '#D9822B', selected: '#A65F1A', icon: '🛝' },
+  'Holiday Events':  { color: '#B9382F', selected: '#7A2320', icon: '🎄' },
 }
 
 export function pinStyleFor(pillLabel) {
@@ -500,6 +509,31 @@ export function mapKindLabel(ev) {
   if (ev.mapKind === 'maze') return `${k.label} / ${ev.free ? 'Free' : 'Paid'}`
   return k.label
 }
+
+// ---------------------------------------------------------------------------
+// Holiday Events map (Nov 3, 2026). Same map as Halloween, but a row's pin
+// comes from its chip tag rather than a map_kind column, so nothing in
+// Supabase changes: the first tag in this order wins, and a row with none of
+// them gets the plain Holiday Events pin. Order matters where a row carries
+// two (an ice rink inside a Christmas village pins as the rink).
+// ---------------------------------------------------------------------------
+export const HOLIDAY_PIN_KINDS = [
+  ['ice-skating',       { color: '#2F6FA8', selected: '#1F4C74', icon: '⛸', label: 'Ice rink' }],
+  ['santa-photos',      { color: '#C94F2C', selected: '#963A20', icon: '🎅', label: 'Santa photos' }],
+  ['christmas-village', { color: '#1A6B4A', selected: '#124D35', icon: '🎄', label: 'Christmas village' }],
+  ['train-ride',        { color: '#5A2E8C', selected: '#3B1F5E', icon: '🚂', label: 'Trains' }],
+  ['drive-through',     { color: '#D9822B', selected: '#A65F1A', icon: '🚙', label: 'Drive through' }],
+  ['home-display',      { color: '#F0A03C', selected: '#B8761F', icon: '🏠', label: 'Yard displays' }],
+  ['holiday-show',      { color: '#D0487A', selected: '#A03259', icon: '🎭', label: 'Holiday shows' }],
+]
+
+export function pinStyleForHoliday(ev) {
+  const names = new Set((ev?.tags || []).map((t) => t.name))
+  const hit = HOLIDAY_PIN_KINDS.find(([tag]) => names.has(tag))
+  return hit ? hit[1] : pinStyleFor('Holiday Events')
+}
+
+export const HOLIDAY_MAP_LEGEND = HOLIDAY_PIN_KINDS.map(([, k]) => ({ icon: k.icon, label: k.label }))
 
 // The nine city maps. Slug is what /halloween/<slug> links carry; `cities`
 // are the events.city values that belong on that map, so Tri-Valley can pool

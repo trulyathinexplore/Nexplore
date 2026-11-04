@@ -203,3 +203,22 @@ div.nx-frow,.nx-frow>summary{display:grid;grid-template-columns:84px minmax(0,1f
 .nx-sbody-text{font-size:13px;color:#5C5C56;line-height:1.6;white-space:pre-line}
 .nx-sdisc{margin:0;font-size:11.5px;line-height:1.45;color:var(--muted);font-style:italic}
 @media (prefers-reduced-motion:reduce){.nx-fchev svg{transition:none}}
+
+/* List card, Nov 3 2026 redesign ("option F"): text first, photo fills the
+   right side, Learn more at the foot of the text column. Without a photo the
+   text takes the full width and the button keeps the photo-card width. */
+.nx-row{display:flex;background:#fff;border-radius:16px;overflow:hidden;margin:0 0 10px;box-shadow:0 1px 2px rgba(32,26,18,.05),0 4px 12px rgba(32,26,18,.07);cursor:pointer}
+.nx-rowbody{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;padding:12px 14px}
+.nx-row.has-photo .nx-rowbody{padding-right:12px}
+.nx-rowbody h4{margin:0;font-size:15px;font-weight:700;line-height:1.28;color:var(--charcoal);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.nx-statusrow{display:flex;flex-wrap:wrap;gap:4px}
+.nx-statusrow .nx-ob{border-radius:999px;padding:3px 8px;font-size:9.5px}
+.nx-rowactions{margin-top:auto;padding-top:6px;display:flex}
+.nx-rowactions .nx-btn{flex:0 0 55%;padding:9px 0}
+.nx-row.has-photo .nx-rowactions .nx-btn{flex:1}
+.nx-rowphoto{flex:none;width:42%;min-height:150px;position:relative;background:var(--sand-dark)}
+.nx-rowphoto img{position:absolute;inset:0;width:100%;height:100%!important;object-fit:cover}
+.nx-rowphoto>div{position:absolute;inset:0;height:100%!important}
+.nx-rowplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;border:0;padding:0;border-radius:50%;background:#fff;color:#C94F2C;display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;z-index:2}
+.nx-rowplay svg{margin-left:3px}
+.nx-row.closed .nx-rowphoto img{filter:saturate(.6)}

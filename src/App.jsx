@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { fetchEvents, mapEvent, resolveCoords } from './supabase.js'
-import { PILLS, PAGE_AMENITY_LABELS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent, pinStyleFor, pinStyleForEvent, MAP_KINDS, HALLOWEEN_MAP_CITIES } from './constants.js'
+import { PILLS, PAGE_AMENITY_LABELS, REGION_CITIES, matchesPill, detectPillFromSearch, detectCityFromSearch, EXCLUDED_AMENITY_TAGS, AMENITY_LABELS, themeFor, countLabel, hidesPrice, hidesPriceForEvent, pinStyleFor, pinStyleForEvent, pinStyleForHoliday, HOLIDAY_MAP_LEGEND, MAP_KINDS, HALLOWEEN_MAP_CITIES } from './constants.js'
 import { orderForPill, orderTopPicks, avoidSameFirst } from './ordering.js'
 import { sortClosedLast, isClosedForSeason } from './season.js'
 import {
@@ -48,7 +48,7 @@ const outOfSeasonHeadline = (pillLabel) =>
 // amusement parks) are linked to venues that already carry lat/lng, so without
 // this gate the Map button turns up on almost every pill. Add a label here when
 // a category is ready to be mapped.
-const MAP_ENABLED_PILLS = ['Pumpkin Patches', 'Playground', 'Halloween']
+const MAP_ENABLED_PILLS = ['Pumpkin Patches', 'Playground', 'Halloween', 'Holiday Events']
 
 // The Halloween map's tour: at most this many stops, which is what Google Maps
 // accepts as waypoints on one route link.
@@ -531,6 +531,10 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
   // with no further changes here.
   const mapEnabled = MAP_ENABLED_PILLS.includes(activePill?.label)
   const isHalloween = activePill?.label === 'Halloween'
+  // Holiday Events (Nov 3, 2026) gets the Halloween map and the Add-to-tour
+  // route bar; pins come from chip tags (pinStyleForHoliday), not map_kind.
+  const isHoliday = activePill?.label === 'Holiday Events'
+  const tourPill = isHalloween || isHoliday
   const hasCoords = (ev) => typeof ev.lat === 'number' && typeof ev.lng === 'number'
   const mappable = mapEnabled
     ? [...upcoming, ...mapOnlyUpcoming].filter((ev) => hasCoords(ev) && ev.mapKind !== 'rollup')
@@ -985,12 +989,12 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
                 events={mappable}
                 theme={theme}
                 pin={pinStyleFor(activePill?.label)}
-                pinFor={isHalloween ? (ev) => pinStyleForEvent(ev, pill) : null}
-                legend={isHalloween ? Object.values(MAP_KINDS).map((k) => ({ icon: k.icon, label: k.label })) : null}
+                pinFor={isHalloween ? (ev) => pinStyleForEvent(ev, pill) : isHoliday ? pinStyleForHoliday : null}
+                legend={isHalloween ? Object.values(MAP_KINDS).map((k) => ({ icon: k.icon, label: k.label })) : isHoliday ? HOLIDAY_MAP_LEGEND : null}
                 circle={zip.center ? { center: zip.center, miles: zip.radius } : null}
                 listButtonOffset={isHalloween ? 22 : 22}
-                tourIds={isHalloween ? tourSet : null}
-                onTourToggle={isHalloween ? (ev, on) => toggleTour(ev, on, 'pin_card') : null}
+                tourIds={tourPill ? tourSet : null}
+                onTourToggle={tourPill ? (ev, on) => toggleTour(ev, on, 'pin_card') : null}
                 tourFull={tourFull}
                 focusId={focusId}
                 // Learn more on a pin card opens the detail sheet, the same one
@@ -1139,7 +1143,7 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
           <div style={{ height: 80 }} />
 
           {/* Floating map button, bottom middle, same as today. */}
-          {!loading && mappable.length > 0 && !showMap && !openEvent && !shareTarget && !(isHalloween && tourEvents.length > 0) && (
+          {!loading && mappable.length > 0 && !showMap && !openEvent && !shareTarget && !(tourPill && tourEvents.length > 0) && (
             <button
               onClick={() => { openMap('floating_button'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
               style={{
@@ -1167,14 +1171,16 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
         hidePrice={hidePrice || hidesPriceForEvent(openEvent)}
         page={pill}
         tourChecked={!!openEvent && tourSet.has(openEvent.id)}
-        onTourToggle={isHalloween && openEvent && openEvent.mapKind && openEvent.mapKind !== 'rollup' ? (ev, on) => toggleTour(ev, on, 'detail_sheet') : null}
+        onTourToggle={
+          (isHalloween && openEvent && openEvent.mapKind && openEvent.mapKind !== 'rollup') || (isHoliday && openEvent && hasCoords(openEvent))
+            ? (ev, on) => toggleTour(ev, on, 'detail_sheet') : null}
         tourFull={tourFull}
       />
 
       {/* The Halloween tour bar: always there while the map is open (as a
           prompt), and anywhere on the pill once a stop has been checked. */}
-      {isHalloween && (showMap || tourEvents.length > 0) && !openEvent && !shareTarget && (
-        <TourBar stops={tourEvents} onOpen={openTourRoute} onClear={clearTour} max={MAX_TOUR_STOPS} />
+      {tourPill && (showMap || tourEvents.length > 0) && !openEvent && !shareTarget && (
+        <TourBar stops={tourEvents} onOpen={openTourRoute} onClear={clearTour} max={MAX_TOUR_STOPS} noun={isHoliday ? 'holiday lights' : 'Halloween'} />
       )}
 
       <ShareSheet

@@ -21,13 +21,41 @@ function demoVideo(e) {
 }
 
 // Embed category name + tags + venue (for city/address) so pills/amenities can filter on them.
+// PostgREST caps a single response at 1000 rows. Published events passed that
+// in October 2026 (1623 on Nov 3), and because the list is ordered by
+// start_date the undated rows sort last and were silently dropped: every
+// year-round rink, most Indoor Play spots, many playgrounds. So the fetch pages
+// in blocks of PAGE using Range headers. The first page asks for the exact
+// count; the remaining pages load in parallel. Ordering by start_date then id
+// keeps ties from straddling a page boundary.
+const PAGE = 1000
+
 export async function fetchEvents({ freeOnly = false } = {}) {
-const select = '*,categories(name),event_tags(tags(*)),venues(name,address,city,state,latitude,longitude)'
-   let url = `${SUPABASE_URL}/rest/v1/events?select=${encodeURIComponent(select)}&status=eq.published&order=start_date.asc`
+  const select = '*,categories(name),event_tags(tags(*)),venues(name,address,city,state,latitude,longitude)'
+  let url = `${SUPABASE_URL}/rest/v1/events?select=${encodeURIComponent(select)}&status=eq.published&order=start_date.asc,id.asc`
   if (freeOnly) url += '&is_free=eq.true'
-  const res = await fetch(url, { headers })
-  if (!res.ok) throw new Error(`Supabase error: ${res.status}`)
-  const events = await res.json()
+
+  const page = async (from, to, exact = false) => {
+    const h = { ...headers, Range: `${from}-${to}`, 'Range-Unit': 'items' }
+    if (exact) h.Prefer = 'count=exact'
+    const res = await fetch(url, { headers: h })
+    if (!res.ok && res.status !== 206) throw new Error(`Supabase error: ${res.status}`)
+    const rows = await res.json()
+    const total = Number((res.headers.get('content-range') || '').split('/')[1])
+    return { rows, total: Number.isFinite(total) ? total : null }
+  }
+
+  const first = await page(0, PAGE - 1, true)
+  let events = first.rows
+  const total = first.total ?? events.length
+  if (total > events.length) {
+    const rest = []
+    for (let from = events.length; from < total; from += PAGE) {
+      rest.push(page(from, Math.min(from + PAGE, total) - 1))
+    }
+    const pages = await Promise.all(rest)
+    events = events.concat(...pages.map(p => p.rows))
+  }
  
   // Merge with local beach data
   const mappedBeaches = BEACHES.map(mapBeach)
