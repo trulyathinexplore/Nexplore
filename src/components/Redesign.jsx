@@ -16,17 +16,28 @@ import { PILLS, themeFor, badgesFor, badgeLabel, pillForEvent } from '../constan
 // the Nightfall at Filoli photo; the listing itself stays as it is.
 export const HALLOWEEN_PHOTO = '/media/halloween/filoli.jpg'
 
-// The categories shown as circles. Zoo & Aquarium, Museum and Beaches are left
-// out on purpose for now; their pages still work from Home and old links.
-// `photo` is used when set, otherwise the gradient + icon stands in.
+// The categories shown as circles, in the order they appear left to right.
+// Order set by RAG on 2026-11-05. `photo` is used when set, otherwise the
+// gradient + icon stands in.
+//
+// The three hidden seasonal pills sit between Holiday Events and Indoor Play
+// rather than at the end, so that when `hidden` is deleted from them in
+// August and September they come back near the front of the row where a
+// seasonal pill belongs, instead of off the end of a phone screen.
 export const CATEGORY_CIRCLES = [
   { pill: 'Playground', photo: '/media/home/playgrounds-sm.jpg', bg: 'linear-gradient(150deg,#9ac27d,#4f7d3a)' },
   { pill: 'Events', photo: '/media/home/events-sm.jpg', bg: 'linear-gradient(150deg,#2f8a63,#12583a)' },
-  { pill: 'Indoor Play', photo: '/media/home/indoor-play-sm.jpg', bg: 'linear-gradient(150deg,#f0a868,#c4622d)' },
+  { pill: 'Holiday Events', photo: '/media/home/holiday-events-sm.jpg', bg: 'linear-gradient(150deg,#c0504d,#7a2320)' },
+  // Hidden out of season, see PILLS in constants.js.
   { pill: 'Pumpkin Patches', photo: '/media/pumpkin.jpg', bg: 'linear-gradient(150deg,#e8a15a,#b8561f)' },
   { pill: 'Halloween', photo: HALLOWEEN_PHOTO, bg: 'linear-gradient(150deg,#8b7ab8,#4b3d70)' },
   { pill: 'Fruit Picking', photo: '/media/apple.jpg', bg: 'linear-gradient(150deg,#8fb56a,#4a7a2e)' },
-  { pill: 'Holiday Events', photo: '/media/home/holiday-events-sm.jpg', bg: 'linear-gradient(150deg,#c0504d,#7a2320)' },
+  { pill: 'Indoor Play', photo: '/media/home/indoor-play-sm.jpg', bg: 'linear-gradient(150deg,#f0a868,#c4622d)' },
+  // Nov 5 2026: four categories added to the row, all with RAG's own photos.
+  { pill: 'Train Rides', photo: '/media/home/train-rides-sm.jpg', bg: 'linear-gradient(150deg,#8a9a7b,#3f5235)' },
+  { pill: 'Zoo & Aquarium', photo: '/media/home/zoo-aquarium-sm.jpg', bg: 'linear-gradient(150deg,#f0a08f,#b8543f)' },
+  { pill: 'Museum', photo: '/media/home/museum-sm.jpg', bg: 'linear-gradient(150deg,#6fa3cc,#28527a)' },
+  { pill: 'Amusement Parks', photo: '/media/home/amusement-parks-sm.jpg', bg: 'linear-gradient(150deg,#e8788a,#a62f4a)' },
   { pill: 'Boat Rides', photo: '/media/home/boat-rides-sm.jpg', bg: 'linear-gradient(150deg,#5c86ab,#1f3a6b)' },
 ]
 
@@ -127,27 +138,6 @@ function freeLabel(ev, page) {
   return /admission/i.test(ev.price || '') ? 'Free Admission' : 'Free'
 }
 
-function PhotoBadges({ ev, hidePrice, theme, page, extraTop, extraBottom }) {
-  // Playgrounds never get it: nearly all are free, so it says nothing.
-  const showFree = !hidePrice && ev.free && ev.category !== 'Playground'
-  // Playgrounds only: set by SQL (newly_opened), stays until it is removed.
-  const showNew = ev.category === 'Playground' && ev.newlyOpened
-  return (
-    <>
-      <div className="nx-ptop">
-        {extraTop}
-        {showNew && <span className="nx-ob" style={{ background: '#1A6B4A', color: '#fff', fontWeight: 800 }}>Newly opened</span>}
-        {showFree && (
-          <span className="nx-ob" style={{ background: '#1A6B4A', color: '#fff', fontWeight: 800 }}>{freeLabel(ev, page)}</span>
-        )}
-        {ev.isEditorPick && <span className="nx-ob" style={{ background: '#C94F2C', color: '#fff' }}>✦ Top pick</span>}
-      </div>
-      <div className="nx-pbot">
-        {extraBottom}
-      </div>
-    </>
-  )
-}
 
 // Ages + Reservation required (events and everything else).
 function EventChips({ ev, extra = [] }) {
@@ -245,34 +235,6 @@ function CardBadges({ ev, page, onMore }) {
 //   Playground: name, city, amenity chips (right after the city).
 //   Everything else: name, Ages / Reservation chips (right after the name),
 //   city, date.
-function CardText({ ev, hidePrice, onShare, Title, extraChips, page, onMore }) {
-  // Cards show only opening to closing date ("SEP 26 – NOV 1"). The detailed
-  // schedule ("Fri to Sun, through Nov 1") and times live in the sheet.
-  const range = openCloseLabel(ev)
-  const status = statusLine(ev)
-  // City only. The free badge on the photo already says the price, and
-  // playgrounds are assumed free, so no price text repeats here.
-  const meta = <div className="nx-meta">{ev.city || ev.area}</div>
-  return (
-    <>
-      <div className="nx-titlerow">
-        <Title>{ev.title}</Title>
-        <ShareBtn small onClick={() => onShare(ev)} />
-      </div>
-      {isPlayground(ev) ? (
-        <>{meta}<AmenityChips ev={ev} />{status && <div className={`nx-status ${status.cls}`}>{status.text}</div>}</>
-      ) : (
-        <>
-          <EventChips ev={ev} extra={extraChips} />
-          {meta}
-          {range && <div className="nx-when">{range}</div>}
-          {status && <div className={`nx-status ${status.cls}`}>{status.text}</div>}
-          <CardBadges ev={ev} page={page} onMore={onMore} />
-        </>
-      )}
-    </>
-  )
-}
 
 const hasOfficial = (ev) => {
   const u = ev.officialUrl || ''
@@ -304,26 +266,36 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
   // Playgrounds: the card opens the official page (or directions when there
   // is none) and the button is Directions. Everything else opens the sheet.
   const open = () => (pg ? (hasOfficial(ev) ? onOfficial(ev) : onDirections(ev)) : onLearnMore(ev))
-  const H3 = ({ children }) => <h3>{children}</h3>
+  // Nov 5 2026: brought in line with the F list card below it. Status badges
+  // sit above the title instead of floating on the photo, and the text runs
+  // title, date, city, chips in the same order, so Top picks and the list no
+  // longer read as two different products.
+  const range = openCloseLabel(ev)
+  const where = ev.city || ev.area
+  const closed = seasonState(ev).state === 'closed'
   return (
-    <article className="nx-big" onClick={open}>
+    <article className={`nx-big${closed ? ' closed' : ''}`} onClick={open}>
       <div className="nx-art">
-        <EventImage event={ev} height={118} />
-        <PhotoBadges ev={ev} hidePrice={hidePrice} theme={theme} page={page} />
+        <EventImage event={ev} height={118} width={900} />
         {ev.videoUrl && <PlayBadge big onClick={() => onLearnMore(ev, true)} />}
       </div>
       <div className="nx-bigbody">
-        <CardText ev={ev} hidePrice={hidePrice} onShare={onShare} Title={H3} page={page} onMore={(x) => onLearnMore(x)} />
+        <StatusRow ev={ev} hidePrice={hidePrice} page={page} />
+        <div className="nx-titlerow">
+          <h3>{ev.title}</h3>
+          <ShareBtn small onClick={() => onShare(ev)} />
+        </div>
+        {range && <div className="nx-when">{range}</div>}
+        {where && <div className="nx-meta">{where}</div>}
+        {pg ? <AmenityChips ev={ev} /> : <EventChips ev={ev} />}
+        {!pg && <CardBadges ev={ev} page={page} onMore={(x) => onLearnMore(x)} />}
         <div className="nx-actions">
           {pg ? (
             <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onDirections(ev) }}>📍 Directions</button>
-          ) : ev.mapKind === 'rollup' ? (
-            // A city roll-up ("Palo Alto Home Haunt Tour", "Trick or Treat in
-            // Palo Alto"): the whole card IS the map, so the button says so.
-            // App.jsx routes a roll-up straight to that city's map.
-            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onLearnMore(ev) }}>Learn more</button>
           ) : (
-            <button className="nx-btn solid" onClick={(e) => { e.stopPropagation(); onLearnMore(ev) }}>Learn more</button>
+            // A city roll-up ("Palo Alto Home Haunt Tour") is itself a map;
+            // App.jsx routes it straight to that city's map from the same call.
+            <button className={`nx-btn${closed ? ' more' : ' solid'}`} onClick={(e) => { e.stopPropagation(); onLearnMore(ev) }}>Learn more</button>
           )}
         </div>
       </div>
@@ -366,6 +338,7 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
   const range = openCloseLabel(ev)
   const season = seasonState(ev)
   const closed = season.state === 'closed'
+  const where = ev.city || ev.area
   return (
     <article className={`nx-row${hasPhoto ? ' has-photo' : ''}${closed ? ' closed' : ''}`} onClick={open}>
       <div className="nx-rowbody">
@@ -374,8 +347,21 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
           <h4>{ev.title}</h4>
           <ShareBtn small onClick={() => onShare(ev)} />
         </div>
-        {range && <div className="nx-when">{range}</div>}
-        <div className="nx-meta">{ev.city || ev.area}</div>
+        {/* With a photo the card is tall anyway, so date and place get a line
+            each. Without one, they share a line and the card loses a row. */}
+        {hasPhoto ? (
+          <>
+            {range && <div className="nx-when">{range}</div>}
+            {where && <div className="nx-meta">{where}</div>}
+          </>
+        ) : (
+          (range || where) && (
+            <div className="nx-when">
+              {range}
+              {where && <span className="nx-where">{range ? ` · ${where}` : where}</span>}
+            </div>
+          )
+        )}
         {pg ? <AmenityChips ev={ev} /> : <EventChips ev={ev} extra={extraChips} />}
         {!pg && <CardBadges ev={ev} page={page} onMore={(x) => onToggle(x, false)} />}
         <div className="nx-rowactions">

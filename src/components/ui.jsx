@@ -57,9 +57,15 @@ export function sizedImageUrl(url, width = 600) {
 // aspectRatio (e.g. "4 / 5") is used for Playground cards; height (px) everywhere else.
 // Each image is tried in order: resized photo, original photo, playground
 // placeholder. Only when all of those fail does the letter tile appear.
-export function EventImage({ event, height, aspectRatio }) {
+// `width` is the widest the image is ever drawn, in DEVICE pixels, and it is
+// what the resizer is asked for. A list card's photo is ~165 CSS px wide, so
+// 600 covers a 3x phone; a Top pick or the detail sheet is drawn two to three
+// times wider and looked soft at 600 (RAG, 2026-11-04). Pass a bigger number
+// there rather than raising the default, which would make every list card
+// heavier for nothing.
+export function EventImage({ event, height, aspectRatio, width = 600 }) {
   const placeholder = placeholderFor(event)
-  const candidates = [...new Set([sizedImageUrl(event.imageUrl), event.imageUrl, placeholder].filter(Boolean))]
+  const candidates = [...new Set([sizedImageUrl(event.imageUrl, width), event.imageUrl, placeholder].filter(Boolean))]
   const [step, setStep] = useState(0)
   const src = candidates[step]
   const isPlaceholder = !!src && src === placeholder
@@ -327,7 +333,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
             is because it is expanded or because it is a featured pick. Keeping
             150 across 440px makes a banner that pushes the thing someone
             actually tapped for below the fold. */}
-        <EventImage event={event} height={(expanded || wide) ? 132 : 150} />
+        <EventImage event={event} height={(expanded || wide) ? 132 : 150} width={(expanded || wide) ? 1200 : 900} />
         {/* hidePrice takes the FREE badge with it. On a pill where cost is
             deliberately not shown, a FREE badge on one card and silence on the
             rest reads as an inconsistency rather than as information. */}
@@ -686,7 +692,7 @@ function SheetMedia({ event, autoPlay }) {
         <video
           ref={ref}
           src={event.videoUrl}
-          poster={sizedImageUrl(event.imageUrl) || undefined}
+          poster={sizedImageUrl(event.imageUrl, 1200) || undefined}
           muted
           loop
           playsInline
@@ -716,10 +722,10 @@ function SheetMedia({ event, autoPlay }) {
   }
   // No video: today's landscape photo. With a video: the same tall portrait
   // box as the player, however the sheet was opened.
-  if (!event.videoUrl) return <EventImage event={event} height={190} />
+  if (!event.videoUrl) return <EventImage event={event} height={190} width={1200} />
   return (
     <div style={PORTRAIT_BOX}>
-      <EventImage event={event} height={'100%'} />
+      <EventImage event={event} height={'100%'} width={1200} />
       {event.videoUrl && (
         <button
           onClick={() => setPlaying(true)}
