@@ -79,6 +79,16 @@ const VIEWS = {
     desc: 'Indoor playgrounds, free library play spaces, arcades, mini golf, trampoline parks, bowling and hands-on spots like LEGO and slime making, across the Bay Area.' },
   'boat-rides':      { noun: 'Boat Rides',          query: 'category_id=eq.18',
     desc: 'Lake rentals, ferries and bay cruises across the Bay Area. Pedal boats and kayaks, the Sausalito and Angel Island ferries, and the ones that stay open all winter.' },
+  // Nov 5 2026. Both filter on the category NAME through an inner join, the
+  // same way Indoor Play does, because neither id is hardcoded anywhere in
+  // the app. If the join ever fails the generic Nexplore preview shows, which
+  // is no worse than having no entry at all.
+  'train-rides':     { noun: 'Train Rides',         query: 'categories.name=eq.Train%20Ride', select: 'id,categories!inner(name)',
+    desc: 'Steam trains, miniature railways and park trains across the Bay Area. Where they run, what a ride costs and which ones keep going through winter.' },
+  'amusement-parks': { noun: 'Amusement Parks',     query: 'categories.name=eq.Amusement%20Park', select: 'id,categories!inner(name)',
+    desc: 'Theme parks and small family parks around the Bay Area, from the big coasters to the ones built for toddlers, with what each is actually suited to.' },
+  'zoo-aquarium':    { noun: 'Zoos & Aquariums',    query: 'categories.name=in.(Zoo,Aquarium)', select: 'id,categories!inner(name)',
+    desc: 'Zoos, aquariums and wildlife parks across the Bay Area, with hours, what to see and how long to allow.' },
 }
 
 // Sections of the home page, shareable as ?section=. A query param rather than
