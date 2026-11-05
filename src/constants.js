@@ -81,6 +81,15 @@ export const PILLS = [
     fixedAmenities: ['free', 'ice-skating', 'christmas-village', 'santa-photos',
                      'train-ride', 'drive-through', 'home-display', 'holiday-show'] },
   { label: 'County Fairs',  type: 'tagGroup',  value: 'county-fair', hidden: true },
+  // Train Rides and Amusement Parks, Nov 5 2026. Matched by category NAME, so
+  // no id is hardcoded here and the SQL can create the category however it
+  // likes. Holiday trains are NOT in this pill: a railway's December product
+  // has its own dates, hours, price and ticket page, so it lives as a separate
+  // row under Holiday Events and ages out on its end_date. See the backlog.
+  { label: 'Train Rides',   type: 'category',  value: 'Train Ride',
+    fixedAmenities: ['free', 'steam-train', 'miniature-train', 'open-year-round', 'wheelchair-accessible'] },
+  { label: 'Amusement Parks', type: 'category', value: 'Amusement Park',
+    fixedAmenities: ['toddler-rides', 'water-rides', 'open-year-round', 'free-parking'] },
   { label: 'Zoo & Aquarium', type: 'category', value: ['Zoo', 'Aquarium']},
   { label: 'Museum',        type: 'category',  value: 'Museum' },
   { label: 'Beaches',       type: 'category',  value: 'Beach',
@@ -122,6 +131,8 @@ const COUNT_WORDS = {
   'Beaches':         { one: 'beach',           many: 'beaches',          verb: 'to visit' },
   'Boat Rides':      { one: 'boat ride',       many: 'boat rides',       verb: 'to take' },
   'Indoor Play':     { one: 'indoor spot',     many: 'indoor spots',     verb: 'to play' },
+  'Train Rides':     { one: 'train ride',      many: 'train rides',      verb: 'to take' },
+  'Amusement Parks': { one: 'amusement park',  many: 'amusement parks',  verb: 'to visit' },
 }
 
 // Falls back to the old wording when a pill has no entry, so adding a pill
@@ -145,7 +156,13 @@ export function countLabel(pillLabel, n) {
 // means Nexplore is never the thing quoting a wrong number.
 //
 // Pumpkin patch admission genuinely IS comparable, so it keeps its prices.
-export const HIDE_PRICE_PILLS = ['Boat Rides']
+//
+// Train Rides and Amusement Parks join it for the same reason (Nov 5 2026).
+// A train is priced per ride ($4 at Tilden) and a theme park per day with
+// variable pricing that moves week to week ($50 to $90 at Great America), so
+// one number on a card is either stale or compares two different things. The
+// card links out; the operator quotes the price.
+export const HIDE_PRICE_PILLS = ['Boat Rides', 'Train Rides', 'Amusement Parks']
 export const hidesPrice = (pillLabel) => HIDE_PRICE_PILLS.includes(pillLabel)
 
 // The same question answered from an EVENT rather than the active pill.
@@ -301,6 +318,12 @@ export const AMENITY_LABELS = {
   'indoor-activity': '🧩 Indoor activities',
   'bowling': '🎳 Bowling',
   'bike-track': '🚲 Bike tracks',
+  // Train Rides and Amusement Parks chips (Nov 5 2026)
+  'steam-train': '🚂 Steam trains',
+  'miniature-train': '🚃 Miniature trains',
+  'toddler-rides': '🧸 Rides for toddlers',
+  'water-rides': '💦 Water rides',
+  'free-parking': '🅿️ Free parking',
   // Badges only (cards and the detail sheet)
   'toddler-area': '🧸 Toddler zone',
   'big-kids': '🧗 Big kids',

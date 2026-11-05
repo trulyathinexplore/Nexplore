@@ -218,7 +218,27 @@ div.nx-frow,.nx-frow>summary{display:grid;grid-template-columns:84px minmax(0,1f
 .nx-row.has-photo .nx-rowactions .nx-btn{flex:1}
 .nx-rowphoto{flex:none;width:42%;min-height:150px;position:relative;background:var(--sand-dark)}
 .nx-rowphoto img{position:absolute;inset:0;width:100%;height:100%!important;object-fit:cover}
-.nx-rowphoto>div{position:absolute;inset:0;height:100%!important}
-.nx-rowplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;border:0;padding:0;border-radius:50%;background:#fff;color:#C94F2C;display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;z-index:2}
+.nx-rowphoto>div:first-child{position:absolute;inset:0;height:100%!important}
+/* Glass, not a solid white disc (RAG, 2026-11-04): same 44px so the tap
+   target and the signal are unchanged, but it sits on the photo instead of
+   punching a hole in it. */
+.nx-rowplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;border:1.5px solid rgba(255,255,255,.6);padding:0;border-radius:50%;background:rgba(20,20,20,.42);color:#fff;display:grid;place-items:center;box-shadow:0 1px 6px rgba(0,0,0,.25);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);cursor:pointer;z-index:2}
 .nx-rowplay svg{margin-left:3px}
 .nx-row.closed .nx-rowphoto img{filter:saturate(.6)}
+
+/* A card with no photo carries less, so it is scaled down a notch and the
+   date and city share one line (RAG, 2026-11-04). Roughly 25% shorter than a
+   full-size row. Photo cards are untouched: the photo holds them open, and
+   shrinking only their type would make the two kinds look mismatched. */
+.nx-row:not(.has-photo){margin-bottom:8px}
+.nx-row:not(.has-photo) .nx-rowbody{gap:3px;padding:10px 12px}
+.nx-row:not(.has-photo) .nx-rowbody h4{font-size:14px}
+.nx-row:not(.has-photo) .nx-statusrow .nx-ob{font-size:9px;padding:2px 7px}
+.nx-row:not(.has-photo) .nx-when{font-size:11.5px}
+.nx-row:not(.has-photo) .nx-meta{font-size:11px}
+.nx-row:not(.has-photo) .nx-pills{gap:4px}
+.nx-row:not(.has-photo) .nx-pill{font-size:9.5px;padding:2px 7px}
+.nx-row:not(.has-photo) .nx-rowactions{padding-top:5px}
+.nx-row:not(.has-photo) .nx-rowactions .nx-btn{flex:0 0 50%;padding:7px 0;font-size:11.5px}
+/* City riding along on the date line, muted so the date still leads. */
+.nx-where{font-weight:400;color:var(--muted)}

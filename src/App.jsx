@@ -372,10 +372,18 @@ export default function App() {
     window.scrollTo(0, 0)
   }
 
+  // One chip at a time (RAG, 2026-11-04): picking a chip replaces whatever
+  // was on, picking the live one clears it. Chips on most pills are kinds of
+  // thing (ice rink, Christmas village) and combining two of them asks for a
+  // Christmas village that is also an ice rink, which is almost always empty.
+  // Playground is the exception: its chips are features, not kinds, and a
+  // parent legitimately wants restrooms AND parking, so there they stack.
+  const singleSelectChips = pill !== 'Playground'
   const toggleAmenity = (name) =>
     setAmenities((cur) => {
       const on = !cur.includes(name)
       trackAmenityFilter(name, on, pill)
+      if (singleSelectChips) return on ? [name] : []
       return on ? [...cur, name] : cur.filter((a) => a !== name)
     })
 
@@ -436,7 +444,11 @@ export default function App() {
     if (!searchDetectedPill && !matchesPill(ev, activePill)) return false
     // If keyword mapped to a pill but user also has a pill selected (not All), still apply it
     if (searchDetectedPill && activePill && !matchesPill(ev, activePill)) return false
-    if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city)) return false
+    // Chain listings (Michaels, Apple, IKEA, Lowe's) are stored once with
+    // city "Bay Area" because they run at many stores. No region contains
+    // that string, so picking a region used to delete every one of them from
+    // the list. They run everywhere, so they belong in every region.
+    if (region && REGION_CITIES[region] && !REGION_CITIES[region].includes(ev.city) && !WIDE_CITIES.includes(ev.city)) return false
 
     // On Events, chain-store listings ("Bay Area") show under every city.
     if (city && (ev.city || '') !== city && !(isEventsPage && WIDE_CITIES.includes(ev.city)) && !onCityMap(ev, city)) return false
