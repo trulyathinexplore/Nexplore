@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+<rect width="300" height="300" fill="#fbe3bb"/>
+<path d="M0 0h300v96H0z" fill="#f6d49a"/>
+<g stroke="#8a3b12" stroke-width="2" fill="none" opacity=".55">
+<path d="M0 26 Q75 52 150 26 T300 26"/>
+</g>
+<g fill="#c94f2c"><circle cx="30" cy="40" r="7"/><circle cx="110" cy="44" r="7"/><circle cx="190" cy="40" r="7"/><circle cx="270" cy="44" r="7"/></g>
+<g fill="#e8a13c"><circle cx="70" cy="48" r="7"/><circle cx="150" cy="40" r="7"/><circle cx="230" cy="48" r="7"/></g>
+<!-- rangoli -->
+<g transform="translate(150 236)">
+<g fill="none" stroke="#c94f2c" stroke-width="3"><circle r="52"/><circle r="36" stroke="#e8a13c"/></g>
+<g fill="#c94f2c"><circle cx="0" cy="-44" r="5"/><circle cx="44" cy="0" r="5"/><circle cx="0" cy="44" r="5"/><circle cx="-44" cy="0" r="5"/></g>
+<g fill="#e8a13c"><circle cx="31" cy="-31" r="5"/><circle cx="31" cy="31" r="5"/><circle cx="-31" cy="31" r="5"/><circle cx="-31" cy="-31" r="5"/></g>
+<g fill="#8a3b12"><path d="M0-24l6 14 14 2-10 10 2 14-12-7-12 7 2-14-10-10 14-2z"/></g>
+</g>
+<!-- the diya -->
+<g transform="translate(150 150)">
+<ellipse cx="0" cy="18" rx="64" ry="10" fill="#8a3b12" opacity=".25"/>
+<path d="M-60 -2q0 30 60 30t60-30q-26 12-60 12t-60-12z" fill="#b8541f"/>
+<path d="M-60 -2q26 12 60 12t60-12q-26 4-60 4t-60-4z" fill="#8a3b12"/>
+<ellipse cx="0" cy="-2" rx="60" ry="10" fill="#d9772f"/>
+<ellipse cx="0" cy="-3" rx="46" ry="7" fill="#f6b23c"/>
+<!-- wick and flame -->
+<path d="M0 -8 C 16 -30 6 -46 0 -58 C -6 -46 -16 -30 0 -8z" fill="#f09a1e"/>
+<path d="M0 -14 C 9 -27 4 -38 0 -46 C -4 -38 -9 -27 0 -14z" fill="#ffd978"/>
+<circle cx="0" cy="-24" r="4" fill="#fff4cf"/>
+</g>
+<!-- small side diyas -->
+<g transform="translate(52 196) scale(.38)"><path d="M-60 -2q0 30 60 30t60-30q-26 12-60 12t-60-12z" fill="#b8541f"/><ellipse cx="0" cy="-2" rx="60" ry="10" fill="#d9772f"/><path d="M0 -8 C 14 -28 5 -42 0 -52 C -5 -42 -14 -28 0 -8z" fill="#f09a1e"/><path d="M0 -14 C 8 -24 3 -33 0 -40 C -3 -33 -8 -24 0 -14z" fill="#ffd978"/></g>
+<g transform="translate(248 196) scale(.38)"><path d="M-60 -2q0 30 60 30t60-30q-26 12-60 12t-60-12z" fill="#b8541f"/><ellipse cx="0" cy="-2" rx="60" ry="10" fill="#d9772f"/><path d="M0 -8 C 14 -28 5 -42 0 -52 C -5 -42 -14 -28 0 -8z" fill="#f09a1e"/><path d="M0 -14 C 8 -24 3 -33 0 -40 C -3 -33 -8 -24 0 -14z" fill="#ffd978"/></g>
+<!-- sparkles -->
+<g fill="#c94f2c"><path d="M60 92l4 10 10 4-10 4-4 10-4-10-10-4 10-4zM236 84l3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/></g>
+</svg>
