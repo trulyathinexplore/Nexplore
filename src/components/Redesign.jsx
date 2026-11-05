@@ -276,7 +276,11 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
   return (
     <article className={`nx-big${closed ? ' closed' : ''}`} onClick={open}>
       <div className="nx-art">
-        <EventImage event={ev} height={118} width={900} />
+        {/* 4:3 rather than a fixed 118px (RAG, 2026-11-05). At this card
+            width 118px was just under 2:1, a letterbox that kept barely a
+            third of a portrait reel frame and cut the top off night shots.
+            A ratio also scales with the card instead of fighting it. */}
+        <EventImage event={ev} aspectRatio="4 / 3" width={900} />
         {ev.videoUrl && <PlayBadge big onClick={() => onLearnMore(ev, true)} />}
       </div>
       <div className="nx-bigbody">
