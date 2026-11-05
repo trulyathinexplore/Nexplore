@@ -20,6 +20,10 @@ export const GROUPS = {
   'stem-coding':      { key: 'stem',     name: 'STEM & coding',      c1: '#D8E6F2', c2: '#2E5E8C', art: '/media/groups/stem.svg' },
   'outdoors-animals': { key: 'outdoors', name: 'Outdoors & animals', c1: '#DCEBD6', c2: '#3F7A34', art: '/media/groups/outdoors.svg' },
   'family-events':    { key: 'family',   name: 'Fun family events',  c1: '#E9DDF3', c2: '#6B4A93', art: '/media/groups/family.svg' },
+  // Diwali (RAG, 2026-11-05): its own tile with a diya, live while tagged
+  // rows exist. Events expire after mid November, the tile goes with them,
+  // and next October the same tag brings it back with new rows.
+  'diwali':           { key: 'diwali',   name: 'Diwali events',      c1: '#FBE3BB', c2: '#8A3B12', art: '/media/groups/diwali.svg' },
 }
 const HALLOWEEN_CHIP = { name: 'Halloween', c1: '#F6D9BF', c2: '#B8561F' }
 const FALLBACK_GROUP = 'family-events'
@@ -31,6 +35,7 @@ const HINTS = {
   'stem-coding': ['Apple', 'Science'],
   'outdoors-animals': ['Off the Grid', 'Farms'],
   'family-events': ['Sensory play', 'Yoga'],
+  'diwali': ['Diya lamps', 'Dandiya'],
   'Halloween': ['Trunk-or-treat', 'Parades'],
   'Pumpkin Patches': ['Corn mazes', 'Hayrides'],
   'Holiday Events': ['Lights', 'Santa photos'],
@@ -185,7 +190,11 @@ export function SeasonCard({ s, count, onOpen }) {
 // trimmed to 72% height, then everything is scaled to the real width. Live
 // counts are shown on the tiles but do not move them.
 const SLOTS = [
-  ['festivals-fairs', 10], ['season1', 10], ['season2', 8], ['crafts-workshops', 6], ['stem-coding', 6],
+  // 'diwali' sits high on purpose: it only exists while tagged rows exist
+  // (early November), and during those two weeks it is the tile people come
+  // for. When the rows expire the slot vanishes and the approved layout
+  // returns exactly as it was.
+  ['festivals-fairs', 10], ['season1', 10], ['diwali', 7], ['season2', 8], ['crafts-workshops', 6], ['stem-coding', 6],
   ['outdoors-animals', 5], ['dm1', 5], ['dm2', 5], ['family-events', 4],
 ]
 
