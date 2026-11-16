@@ -8,7 +8,7 @@ import {
   trackPageEngagement, trackJuly4thFilter, trackShare,
   trackCategoryView, trackScrollDepth, trackAmenityFilter, trackMapOpen,
   trackMapPinClick, trackShareArrival, trackSearchNoResults, trackEmptyState,
-  trackTourStop, trackTourRoute, trackTourClear, trackZipSearch,
+  trackTourStop, trackTourRoute, trackTourClear, trackZipSearch, trackNearSearch,
 } from './analytics.js'
 import { readFilters, writeFilters } from './urlState.js'
 import {
@@ -21,7 +21,8 @@ import {
   targets, copyLink, canNativeShare, nativeShare,
 } from './share.js'
 import MapView from './components/MapView.jsx'
-import { TourBar, NearZipBar, tourRouteUrl, tourCounts, milesBetween, geocodeZip } from './components/HalloweenMap.jsx'
+import { TourBar, tourRouteUrl, tourCounts, milesBetween } from './components/HalloweenMap.jsx'
+import { NearBar, geocodeZipCA, geocodeCityCA, locateMe } from './components/NearBar.jsx'
 import {
   DayRibbon, Mosaic, SeasonCard, GROUPS, WIDE_CITIES, groupsOf, groupName, groupChips,
   collapseSeries, seasonPagesNow, onDay, dayTitle,
@@ -162,7 +163,13 @@ export default function App() {
   // in the order they were checked; the zip search narrows the map to a
   // radius around a zip's centre; focusId is a pin the list asked to show.
   const [tour, setTour] = useState([])
-  const [zip, setZip] = useState({ code: '', radius: 10, center: null, error: null })
+  // Since the Nov 16 2026 Near bar this is the applied location on every
+  // page, not only a zip: kind is 'zip', 'city' or 'me', code is the zip or
+  // city searched for (empty for 'me'), center is [lat, lng] once found.
+  // A link that arrives with ?near= starts with the words in the bar and is
+  // looked up as soon as the listings have loaded (see the effect below).
+  const [zip, setZip] = useState({ code: init.near || '', radius: init.mi || 10, center: null, error: null })
+  const nearReq = useRef(0)
   const [focusId, setFocusId] = useState(null)
   // The pinned filter/title block sits right under the sticky header; keep its
   // offset equal to the header's real height.
@@ -224,10 +231,10 @@ export default function App() {
   }, [freeOnly])
 
   useEffect(() => {
-    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap, section, city })
+    writeFilters({ pill, region, free: freeOnly, weekend, month, amenities, q: search, event: openEventId, map: showMap, section, city, near: zip.kind === 'me' ? null : zip.code || null, mi: zip.radius })
     // A card left open on one filter has no business being open on the next.
     setExpandedId(null)
-  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap, section, city, nextWeekend, dayPick])
+  }, [pill, region, freeOnly, weekend, month, amenities, search, openEventId, showMap, section, city, nextWeekend, dayPick, zip.code, zip.kind, zip.radius])
 
   // A tapped mosaic tile opens its list below; bring it into view.
   useEffect(() => {
@@ -326,6 +333,8 @@ export default function App() {
     && (activePill?.type === 'category' || activePill?.type === 'tagGroup' || activePill?.type === 'seasonalType')
   // Only show date/time chips when Events pill is active
   const isEventsPage = activePill?.label === 'Events'
+  // True for a listing in the city the Near bar is set to.
+  const inNearCity = (ev) => zip.kind === 'city' && !!ev.city && ev.city.toLowerCase() === zip.code.toLowerCase()
 
   // Every filter starts fresh on every page change (Near, sub-pills, Free,
   // dates). Shared links still arrive with their filters, because those are
@@ -333,6 +342,8 @@ export default function App() {
   function resetFilters() {
     setRegion(null)
     setCity(null)
+    nearReq.current += 1
+    setZip({ code: '', radius: 10, center: null, error: null })
     setAmenities([])
     setFreeOnly(false)
     setWeekend(false)
@@ -355,6 +366,7 @@ export default function App() {
     }
     setShowMap(false)
     setTour([])
+    nearReq.current += 1
     setZip({ code: '', radius: 10, center: null, error: null })
   }
 
@@ -368,6 +380,7 @@ export default function App() {
     setBackToEvents(false)
     setShowMap(false)
     setOpenEventId(null)
+    nearReq.current += 1
     setZip({ code: '', radius: 10, center: null, error: null })
     window.scrollTo(0, 0)
   }
@@ -454,9 +467,11 @@ export default function App() {
     if (city && (ev.city || '') !== city && !(isEventsPage && WIDE_CITIES.includes(ev.city)) && !onCityMap(ev, city)) return false
     // A zip radius is on: only rows with a location inside it. Rows with no
     // coordinates drop out (counted, and said so under the pill).
+    // A picked city also keeps its own listings that have no coordinates
+    // yet: they are in that city, so they are inside any radius around it.
     if (zip.center) {
-      if (typeof ev.lat !== 'number' || typeof ev.lng !== 'number') return false
-      if (milesBetween(zip.center, [ev.lat, ev.lng]) > zip.radius) return false
+      if (typeof ev.lat !== 'number' || typeof ev.lng !== 'number') { if (!inNearCity(ev)) return false }
+      else if (milesBetween(zip.center, [ev.lat, ev.lng]) > zip.radius) return false
     }
     if (weekend && ev.startDate && !isThisWeekend(ev.startDate)) return false
     if (nextWeekend && ev.startDate && !isNextWeekend(ev.startDate)) return false
@@ -471,6 +486,9 @@ export default function App() {
   const matchesAmenity = (ev, a) => {
     if (a === 'free') return ev.free === true
     if (a === 'trick-or-treat-street') return ev.mapKind === 'street'
+    // 'deals' is not a tag either: any listing with a coupon or a live
+    // giveaway (Nov 16 2026, see dealFields in supabase.js).
+    if (a === 'deals') return ev.hasDeal === true
     return ev.tags.some((t) => t.name === a)
   }
 
@@ -479,7 +497,7 @@ export default function App() {
   // A fixed pill list hides any amenity no card in view has, so a tap never
   // leads to an empty list. A pill the user already selected always stays.
   const hasAmenity = matchesAmenity
-  const amenityOptions = activePill?.fixedAmenities
+  const amenityList = activePill?.fixedAmenities
     ? activePill.fixedAmenities.filter((a) => amenities.includes(a) || base.some((ev) => hasAmenity(ev, a)))
     : [...new Set(
         base.flatMap((ev) => {
@@ -495,6 +513,19 @@ export default function App() {
             .map((t) => t.name)
         }),
       )].sort()
+
+  // The Deals chip (Nov 16 2026). One chip for both coupons and giveaways,
+  // RAG's call. It is offered on any page where a listing in view has one, so
+  // it never leads to an empty list, and it sits right after Free where a
+  // page has Free, otherwise first. It shows even on a page that has no chip
+  // row of its own.
+  const dealsOn = amenities.includes('deals') || base.some((ev) => ev.hasDeal)
+  const pageAmenities = showAmenities ? amenityList : []
+  const amenityOptions = !dealsOn
+    ? pageAmenities
+    : pageAmenities[0] === 'free'
+      ? ['free', 'deals', ...pageAmenities.slice(1)]
+      : ['deals', ...pageAmenities]
 
   // 'free' is a special case — it maps to price_type ('ev.free'), not a tag, so it can't be matched via ev.tags
 const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev, a)))
@@ -515,7 +546,19 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
   // planning a spring trip still finds Vasona in March. Year-round rows are
   // untouched, which today is everything outside Boat Rides.
   // Pumpkin Patches and Halloween have their own order (src/ordering.js).
-  const upcoming = orderForPill(pill, sortClosedLast(upcomingUnsorted, now), now)
+  // A location is set (zip, city or "Use my location"): nearest first, on
+  // every page (RAG, Nov 16 2026). Each row carries its distance so the card
+  // can say "3.2 mi". A listing in the picked city with no coordinates counts
+  // as in town and sorts with the nearest. Closed-for-the-season rows still
+  // go last. Array.sort is stable, so equal distances keep their date order.
+  const byDistance = (list) => list
+    .map((ev) => (typeof ev.lat === 'number' && typeof ev.lng === 'number'
+      ? { ...ev, distanceMi: milesBetween(zip.center, [ev.lat, ev.lng]) }
+      : ev))
+    .sort((a, b) => (a.distanceMi ?? 0) - (b.distanceMi ?? 0))
+  const upcoming = zip.center
+    ? sortClosedLast(byDistance(upcomingUnsorted), now)
+    : orderForPill(pill, sortClosedLast(upcomingUnsorted, now), now)
 
   // Every single result is out of season: the season itself is over, and the
   // list needs to say so rather than looking like a normal browsable page.
@@ -553,7 +596,7 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
     : []
   // How many rows the zip radius hid only because they have no coordinates.
   const noLocationCount = zip.center
-    ? events.filter((ev) => matchesPill(ev, activePill) && (typeof ev.lat !== 'number' || typeof ev.lng !== 'number') && !ev.mapOnly).length
+    ? events.filter((ev) => matchesPill(ev, activePill) && (typeof ev.lat !== 'number' || typeof ev.lng !== 'number') && !ev.mapOnly && !inNearCity(ev)).length
     : 0
 
   // ---- Halloween tour ----------------------------------------------------
@@ -575,23 +618,85 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
   }
   const clearTour = () => { trackTourClear(tour.length, city); setTour([]) }
 
-  // Zip search on the Halloween map. The lookup goes through Nominatim, which
-  // the app already uses for addresses (see resolveCoords in supabase.js).
-  const runZip = async (code, radius) => {
-    if (!/^\d{5}$/.test(code)) { setZip({ code, radius, center: null, error: code ? 'Enter a 5-digit zip code.' : null }); return }
-    const center = await geocodeZip(code)
-    if (!center) { setZip({ code, radius, center: null, error: `Couldn't find ${code}. Try a Bay Area zip.` }); trackZipSearch(code, radius, 0); return }
+  // ---- Near bar searches (Nov 16 2026) --------------------------------------
+  // Three ways in, one result: a centre point and a radius. Lookups go through
+  // Nominatim, which the app already uses for addresses (see resolveCoords in
+  // supabase.js). nearReq numbers the searches, so an answer that comes back
+  // after a newer search, a clear or a page change is dropped.
+  const countNear = (center, radius) =>
+    events.filter((ev) => matchesPill(ev, activePill) && hasCoords(ev) && milesBetween(center, [ev.lat, ev.lng]) <= radius).length
+  const applyNear = (kind, code, center, radius) => {
     setCity(null)
-    setZip({ code, radius, center, error: null })
-    const n = events.filter((ev) => matchesPill(ev, activePill) && hasCoords(ev) && milesBetween(center, [ev.lat, ev.lng]) <= radius).length
-    trackZipSearch(code, radius, n)
+    setRegion(null)
+    setFocusId(null)
+    setZip({ code, radius, center, error: null, kind })
+    const n = countNear(center, radius)
+    trackNearSearch(kind, code, radius, n)
+    if (kind === 'zip') trackZipSearch(code, radius, n)
   }
-  const clearZip = () => setZip({ code: '', radius: 10, center: null, error: null })
+  const runZip = async (code) => {
+    const radius = zip.radius
+    const req = ++nearReq.current
+    setZip({ code, radius, center: null, error: null, busy: 'zip' })
+    const center = await geocodeZipCA(code)
+    if (req !== nearReq.current) return
+    if (!center) { setZip({ code, radius, center: null, error: `Couldn't find ${code}. Try a California zip code.` }); trackZipSearch(code, radius, 0); return }
+    applyNear('zip', code, center, radius)
+  }
+  // The middle of a city, for the rare time the lookup is unreachable: the
+  // median position of the listings we hold there.
+  const cityCenterFromListings = (name) => {
+    const pts = events.filter((ev) => hasCoords(ev) && (ev.city || '').toLowerCase() === name.toLowerCase())
+    if (!pts.length) return null
+    const mid = (k) => { const v = pts.map((ev) => ev[k]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)] }
+    return [mid('lat'), mid('lng')]
+  }
+  const runCity = async (name) => {
+    const radius = zip.radius
+    const req = ++nearReq.current
+    setZip({ code: name, radius, center: null, error: null, busy: 'city' })
+    const center = (await geocodeCityCA(name)) || cityCenterFromListings(name)
+    if (req !== nearReq.current) return
+    if (!center) { setZip({ code: name, radius, center: null, error: `Couldn't find "${name}". Try a nearby city or a zip code.` }); return }
+    // Show the name the way our listings spell it ("san ramon" -> "San Ramon").
+    const known = events.find((ev) => (ev.city || '').toLowerCase() === name.toLowerCase())
+    applyNear('city', known ? known.city : name, center, radius)
+  }
+  const runMe = async () => {
+    const radius = zip.radius
+    const req = ++nearReq.current
+    setZip({ code: '', radius, center: null, error: null, busy: 'me' })
+    const center = await locateMe()
+    if (req !== nearReq.current) return
+    if (!center) { setZip({ code: '', radius, center: null, error: 'We could not get your location. Type a zip code or city instead.' }); return }
+    applyNear('me', '', center, radius)
+  }
+  const setNearRadius = (radius) => {
+    setZip((z) => ({ ...z, radius }))
+    if (zip.center) trackNearSearch(zip.kind, zip.code, radius, countNear(zip.center, radius))
+  }
+  const clearZip = () => { nearReq.current += 1; setZip({ code: '', radius: zip.radius, center: null, error: null }) }
+  // Halloween only: a "city" there is one of the city maps, matched by name.
+  const pickMapCity = (name) => { clearZip(); setRegion(null); setCity(name); setFocusId(null) }
+  // The X in the bar: also drops a city or region that came from an old link.
+  const clearNear = () => { clearZip(); setCity(null); setRegion(null); setFocusId(null) }
+
+  // A link that arrived with ?near=: look the place up once, when the
+  // listings are in (the city fallback and the result count both need them).
+  const nearFromLink = useRef(init.near)
+  useEffect(() => {
+    if (loading || !nearFromLink.current) return
+    const q = nearFromLink.current
+    nearFromLink.current = null
+    if (/^\d{5}$/.test(q)) runZip(q)
+    else runCity(q)
+  }, [loading])
 
   // "Trick or Treat in <city>" roll-up card: Learn more opens that city's map.
   const openCityMap = (ev) => {
     const entry = HALLOWEEN_MAP_CITIES.find((c) => c.slug === ev.mapCity) || HALLOWEEN_MAP_CITIES.find((c) => c.cities.includes(ev.city))
     setCity(entry ? entry.name : ev.city || null)
+    nearReq.current += 1
     setZip({ code: '', radius: 10, center: null, error: null })
     setFocusId(null)
     openMap('rollup_card')
@@ -873,7 +978,7 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
   // your Top pick ranking (top_pick_rank). Since Oct 2026 they also stay in
   // the main list, which never opens with the same place as the Top picks row.
   const featured = orderTopPicks(upcoming.filter((ev) => ev.isEditorPick))
-  const rest = avoidSameFirst(upcoming, featured[0])
+  const rest = zip.center ? upcoming : avoidSameFirst(upcoming, featured[0])
   const bigLabel = featureLabel(pill)
   const restWords = countLabel(pill, 2).replace(/^\d+\s+/, '').replace(/\s+to\s.*$/, '')
 
@@ -883,12 +988,12 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
   }
 
   // "Clear all": first pill whenever at least one filter is on. Clears Near too.
-  const activeFilterCount = [freeOnly, !!city, !!region, weekend, nextWeekend, !!selectedMonthFilter, !!dayPick]
+  const activeFilterCount = [freeOnly, !!city, !!region, !!zip.center, weekend, nextWeekend, !!selectedMonthFilter, !!dayPick]
     .filter(Boolean).length + amenities.length
   const clearAll = () => { resetFilters(); trackFilterApplied('clear_all', 'enabled') }
 
   // ---- Events page view model ------------------------------------------------
-  const eventsListMode = isEventsPage && (!!dayPick || !!city)
+  const eventsListMode = isEventsPage && (!!dayPick || !!city || !!zip.center)
   const dayList = isEventsPage && dayPick ? upcoming.filter((ev) => onDay(ev, dayPick)) : []
   const listForEvents = dayPick ? dayList : upcoming
   const groupNames = Object.fromEntries(Object.keys(GROUPS).map((k) => [k, groupName(k, events)]))
@@ -901,7 +1006,7 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
 
   const pageSubtitle = loading ? 'Loading...' : (() => {
     const t = countLabel(pill, isEventsPage && dayPick ? dayList.length : upcoming.length)
-    return t.charAt(0).toUpperCase() + t.slice(1) + (zip.center ? ` within ${zip.radius} mi of ${zip.code}` : city ? ` in ${city}` : '')
+    return t.charAt(0).toUpperCase() + t.slice(1) + (zip.center ? ` within ${zip.radius} mi of ${zip.kind === 'me' ? 'you' : zip.code}` : city ? ` in ${city}` : '')
   })()
 
   return (
@@ -925,12 +1030,12 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
           {/* Filter pills + page title stay pinned under the header while scrolling. */}
           <div className="nx-stick">
           {/* Filter pills: the page's own amenity list, or date chips on Events. */}
-          {!isEventsPage && (activeFilterCount > 0 || (showAmenities && amenityOptions.length > 0)) && (
+          {!isEventsPage && (activeFilterCount > 0 || amenityOptions.length > 0) && (
             <div className="nx-subpills">
               {activeFilterCount > 0 && (
                 <button className="nx-sub clear" onClick={clearAll}>✕ Clear all</button>
               )}
-              {showAmenities && amenityOptions.map((name) => {
+              {amenityOptions.map((name) => {
                 const on = amenities.includes(name)
                 return (
                   <button key={name} className={`nx-sub${on ? ' on' : ''}`} onClick={() => toggleAmenity(name)}>
@@ -949,6 +1054,9 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
                 <>
                   {activeFilterCount > 0 && <button className="nx-sub clear nx-rbpill" onClick={clearAll}>✕ Clear all</button>}
                   <button className={`nx-sub nx-rbpill${freeOnly ? ' on' : ''}`} onClick={toggleFreeOnly}>{getAmenityLabel('free')}</button>
+                  {dealsOn && (
+                    <button className={`nx-sub nx-rbpill${amenities.includes('deals') ? ' on' : ''}`} onClick={() => toggleAmenity('deals')}>{getAmenityLabel('deals')}</button>
+                  )}
                 </>
               )}
             />
@@ -978,17 +1086,19 @@ const filteredAll = base.filter((ev) => amenities.every((a) => matchesAmenity(ev
             </div>
           )}
 
-          {/* The Near row (Oct 27, 2026): one pill on EVERY page, list and map:
-              city on the left, zip code in the middle, radius on the right.
-              Replaces the Near picker that used to sit in the header. */}
-          <NearZipBar
-            city={region && !city ? `region:${region}` : (city || '')}
+          {/* The Near row: one pill on EVERY page, list and map. Since Nov 16
+              2026 it is option C: Use my location, one zip-or-city field,
+              miles. See components/NearBar.jsx. */}
+          <NearBar
+            near={zip}
             cities={isHalloween ? HALLOWEEN_MAP_CITIES.map((c) => c.name) : cityOptions}
-            region={region}
-            onCity={(v) => { setRegion(v.startsWith('region:') ? v.slice(7) : null); setCity(v && !v.startsWith('region:') ? v : null); clearZip(); setFocusId(null) }}
-            zip={zip}
-            onSearch={runZip}
-            onClear={clearZip}
+            fixedLabel={city || region || ''}
+            exactCity={isHalloween}
+            onZip={runZip}
+            onCity={isHalloween ? pickMapCity : runCity}
+            onMe={runMe}
+            onRadius={setNearRadius}
+            onClear={clearNear}
             hiddenCount={zip.center ? noLocationCount : 0}
           />
 

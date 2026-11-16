@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { cardBg, REGIONS, themeFor, badgesFor, badgeLabel, pillForEvent, backLabel, mapKindLabel, MAP_KINDS } from '../constants.js'
+import { placeLabel, cardBg, REGIONS, themeFor, badgesFor, badgeLabel, pillForEvent, backLabel, mapKindLabel, MAP_KINDS, DEAL_COLORS, couponBadgeText, giveawayEndLabel } from '../constants.js'
+import { trackDeal } from '../analytics.js'
 import { seasonState } from '../season.js'
 
 export function SearchIcon() {
@@ -108,6 +109,146 @@ export function EventImage({ event, height, aspectRatio, width = 600 }) {
   )
 }
 
+// ---- Coupons and giveaways (Nov 16 2026) ----------------------------------
+// Design approved on the "Nexplore Coupon Codes Prototype" canvas: a gold
+// badge for a coupon and a purple one for a giveaway on every card, and two
+// boxes on the detail sheet. The data is seven columns on `events`
+// (see dealFields in supabase.js); a row with none of them renders nothing.
+export function TagGlyph({ size = 10 }) {
+  return (
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" />
+    </svg>
+  )
+}
+
+export function GiftGlyph({ size = 10 }) {
+  return (
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="8" width="18" height="4" rx="1" />
+      <path d="M5 12v9h14v-9" />
+      <path d="M12 8v13" />
+      <path d="M12 8c-1.5-4-6-4-5.5-1 .3 1.6 3 1 5.5 1z" />
+      <path d="M12 8c1.5-4 6-4 5.5-1-.3 1.6-3 1-5.5 1z" />
+    </svg>
+  )
+}
+
+// The two badges, as siblings, so a caller can drop them into its own badge
+// row. Renders nothing for a listing with no deal.
+export function DealBadges({ ev }) {
+  if (!ev || !ev.hasDeal) return null
+  return (
+    <>
+      {ev.hasCoupon && (
+        <span className="nx-ob deal" style={{ background: DEAL_COLORS.couponBg, color: DEAL_COLORS.couponFg }}>
+          <TagGlyph />{couponBadgeText(ev)}
+        </span>
+      )}
+      {ev.hasGiveaway && (
+        <span className="nx-ob deal" style={{ background: DEAL_COLORS.giveawayBg, color: DEAL_COLORS.giveawayFg }}>
+          <GiftGlyph />Giveaway
+        </span>
+      )}
+    </>
+  )
+}
+
+// navigator.clipboard needs https and a user gesture; both hold on nexplore.us.
+// The textarea path covers older in-app browsers (Instagram, Facebook), which
+// is where most Truly Athi traffic arrives from.
+function legacyCopy(text) {
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.top = '0'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    ta.setSelectionRange(0, text.length)
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // fall through to the textarea path
+  }
+  return legacyCopy(text)
+}
+
+// Coupon box and giveaway box for the detail sheet, under the facts.
+export function DealBoxes({ event }) {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef(null)
+  useEffect(() => {
+    setCopied(false)
+    return () => clearTimeout(timer.current)
+  }, [event && event.id])
+  if (!event || !event.hasDeal) return null
+
+  const onCopy = async () => {
+    const ok = await copyText(event.couponCode)
+    trackDeal('copy_code', event.title, event.couponCode)
+    if (!ok) return // the code stays on screen and is selectable by hand
+    setCopied(true)
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => setCopied(false), 2500)
+  }
+
+  const headline = event.couponDiscount || (event.couponCode ? 'Coupon code' : 'Deal')
+  const sub = event.couponNote || (event.couponCode ? 'enter at checkout' : '')
+  const prize = event.giveawayText
+  const giveawayTitle = !prize ? 'Giveaway' : /^win\b/i.test(prize) ? `Giveaway: ${prize}` : `Giveaway: win ${prize}`
+  const ends = giveawayEndLabel(event)
+
+  return (
+    <>
+      {event.hasCoupon && (
+        <div className="nx-deal coupon">
+          <div className="nx-deal-h">{headline}{sub && <span> · {sub}</span>}</div>
+          {event.couponCode && (
+            <div className="nx-deal-row">
+              <div className="nx-code">{event.couponCode}</div>
+              <button type="button" className="nx-deal-btn" onClick={onCopy} aria-live="polite">
+                {copied ? '✓ Copied' : 'Copy code'}
+              </button>
+            </div>
+          )}
+          {event.couponUrl && (
+            <a className="nx-deal-btn wide" href={event.couponUrl} target="_blank" rel="noopener noreferrer sponsored" onClick={() => trackDeal('open_deal', event.title, event.couponCode)}>
+              Get the deal ↗
+            </a>
+          )}
+        </div>
+      )}
+      {event.hasGiveaway && (
+        <div className="nx-deal giveaway">
+          <div className="nx-deal-txt">
+            <div className="nx-deal-h">{giveawayTitle}</div>
+            {ends && <div className="nx-deal-s">Ends {ends}</div>}
+          </div>
+          {event.giveawayUrl && (
+            <a className="nx-deal-btn" href={event.giveawayUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackDeal('open_giveaway', event.title, '')}>
+              Enter on reel ↗
+            </a>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
 export function EventCardSkeleton() {
   const sh = {
     background: 'linear-gradient(90deg,#ede9e1 25%,#e2ddd6 50%,#ede9e1 75%)',
@@ -193,7 +334,7 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
   const showLearnMore = canExpand || hasLink
   const directionsOnly = !showLearnMore
   // Show city name if available, otherwise fall back to area
-  const locationLabel = event.city || event.area || 'Bay Area'
+  const locationLabel = placeLabel(event) || 'Bay Area'
 
   // Format date range for multi-day events.
   // An explicit "Day display label" from the admin ("Sep 1, 5, 10", "Every
@@ -387,6 +528,9 @@ export function EventCard({ event, onSelect, onDirections, onShare, isEditorPick
       )}
 
       <div style={{ padding: '11px 12px 13px' }}>
+            {event.hasDeal && (
+              <div className="nx-statusrow" style={{ marginBottom: 6 }}><DealBadges ev={event} /></div>
+            )}
             {dateRange && (
               <div style={{ fontSize: 9, fontWeight: 700, color: theme.dateFg, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 5 }}>{dateRange}</div>
             )}
@@ -531,7 +675,7 @@ export function PicksRow({ picks, onSelect }) {
             <div style={{ padding: '7px 9px 9px' }}>
               <div style={{ fontSize: 8, fontWeight: 700, color: '#C94F2C', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{p.dayLabel}</div>
               <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3, margin: '3px 0 2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.title}</div>
-              <div style={{ fontSize: 9, color: '#888880' }}>{p.city || p.area}</div>
+              <div style={{ fontSize: 9, color: '#888880' }}>{placeLabel(p)}</div>
             </div>
           </div>
         ))}
@@ -846,6 +990,7 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
   const parking = (event.parkingInfo || '').trim()
   const address = event.addressLine || ''
   const highlights = event.highlights || []
+  const noMedia = !event.videoUrl && !event.imageUrl && !placeholderFor(event)
 
   return (
     <div
@@ -856,8 +1001,12 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
         onClick={(e) => e.stopPropagation()}
         style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto', paddingBottom: 22 }}
       >
-        <div style={{ position: 'relative' }}>
-          <SheetMedia key={event.id} event={event} autoPlay={autoPlay} />
+        {/* No photo, no video and no placeholder: skip the media block instead
+            of filling 190px with the title's first letter (RAG, Nov 16 2026).
+            The 46px strip that is left only holds the close and share
+            buttons, which keep their usual corners. */}
+        <div style={{ position: 'relative', minHeight: noMedia ? 46 : undefined }}>
+          {!noMedia && <SheetMedia key={event.id} event={event} autoPlay={autoPlay} />}
           <div
             onClick={onClose}
             style={{ zIndex: 2, position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.94)', boxShadow: '0 1px 5px rgba(0,0,0,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, color: '#2D2D2D' }}
@@ -923,6 +1072,8 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
             {address && <FactRow label="📍 Address">{address}</FactRow>}
           </div>
 
+          <DealBoxes event={event} />
+
           {highlights.length > 0 ? (
             <>
               <p className="nx-slbl">Highlights</p>
@@ -938,7 +1089,7 @@ export function EventSheet({ event, onClose, onSelect, onDirections, onShare, th
             body && <div className="nx-sbody-text">{body}</div>
           )}
 
-          <p className="nx-sdisc">* Farm and local business hours, prices and attractions can change. Check their website and socials before you visit.</p>
+          <p className="nx-sdisc">* Farm and local business hours, prices and attractions can change. Check their website and socials before you visit.{event.hasCoupon ? ' Nexplore may earn a commission on some codes.' : ''}</p>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
             <div

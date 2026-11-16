@@ -284,6 +284,9 @@ export const EXCLUDED_AMENITY_TAGS = ['family-friendly', 'family friendly']
 // Amenity emoji and label mapping for pumpkin patches
 export const AMENITY_LABELS = {
   'free': '💚 Free',
+  // Not a tag: any listing with a coupon or a live giveaway (Nov 16 2026).
+  // App.jsx adds it to a page's chip row only when that page has one.
+  'deals': '🏷️ Deals',
   'restrooms': '🚻 Restrooms',
   'parking-onsite': '🅿️ Parking lot',
   'splash-pad': '💦 Splash pad',
@@ -350,6 +353,12 @@ export const AMENITY_LABELS = {
 // Playground keeps its own info line and is not covered by this.
 // ---------------------------------------------------------------------------
 const CARD_BADGES = {
+  // Holiday Events: the page's own chips, plus Open year round for the rinks
+  // that never close (RAG, Nov 16 2026). It is a label on the card and the
+  // detail sheet only. It is NOT in the pill's fixedAmenities, so it does not
+  // become a filter chip.
+  'Holiday Events': ['ice-skating', 'open-year-round', 'christmas-village', 'santa-photos',
+                     'train-ride', 'drive-through', 'home-display', 'holiday-show'],
   'Pumpkin Patches': ['dog-friendly', 'wheelchair-accessible', 'free-parking', 'rides-games'],
   'Halloween': ['family-friendly', 'no-spooks', 'home-display', 'haunted-maze', 'train-ride'],
   'Indoor Play': ['indoor-outdoor', 'toddler-area', 'big-kids', 'drop-in', 'cafe', 'birthday-parties',
@@ -381,6 +390,42 @@ export function badgesFor(ev, pillLabel) {
 
 export function badgeLabel(id, pillLabel) {
   return PAGE_AMENITY_LABELS[pillLabel]?.[id] || AMENITY_LABELS[id] || id.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())
+}
+
+// ---- Coupons and giveaways (Nov 16 2026) ----------------------------------
+// Colors come from the approved prototype: gold for a coupon, purple for a
+// giveaway. Both pass contrast with their text color.
+// "Concord, CA" for the place line on a card (RAG, Nov 16 2026: the bare city
+// read as an afterthought, and without a state it did not read as a place).
+// A listing with no city falls back to its area ("Bay Area"), which is a
+// region, so it gets no state.
+export function placeLabel(ev) {
+  const city = (ev?.city || '').trim()
+  if (!city) return (ev?.area || '').trim()
+  if (/,\s*[A-Za-z]{2}$/.test(city)) return city
+  return `${city}, ${ev.state || 'CA'}`
+}
+
+export const DEAL_COLORS = {
+  couponBg: '#F2B632', couponFg: '#3A2A00',
+  giveawayBg: '#6B3FA0', giveawayFg: '#FFFFFF',
+}
+
+// The gold badge on a card. "10% off with code" when there is a code to copy,
+// just "10% off" when the deal is a link, and a plain fallback when the
+// discount text was left empty.
+export function couponBadgeText(ev) {
+  const d = (ev?.couponDiscount || '').trim()
+  if (d) return ev.couponCode ? `${d} with code` : d
+  return ev?.couponCode ? 'Coupon code' : 'Deal'
+}
+
+// "Dec 20" for the giveaway box. Empty when no end date is set.
+export function giveawayEndLabel(ev) {
+  if (!ev?.giveawayEnd) return ''
+  const d = new Date(ev.giveawayEnd + 'T12:00:00')
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 // "Back to all pumpkin patches" on the detail sheet.

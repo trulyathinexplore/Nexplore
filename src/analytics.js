@@ -204,3 +204,19 @@ export const trackTourClear = (stops, city) => {
 export const trackZipSearch = (zip, radius, results) => {
   trackEvent('map_zip_search', { zip, radius, results });
 };
+
+// Coupons and giveaways (Nov 16 2026). `action` is 'copy_code', 'open_deal'
+// or 'open_giveaway'. Counting copies here means GA4 can report per-listing
+// numbers to partners without a new database table.
+export const trackDeal = (action, eventTitle, code) => {
+  trackEvent('deal_action', {
+    action: action,
+    event_title: eventTitle,
+    coupon_code: code || '',
+  });
+};
+
+// The Near bar (Nov 16 2026). `kind` is 'zip', 'city' or 'me'. For 'me' the
+// query is the word 'me': a visitor's position is never sent anywhere.
+export const trackNearSearch = (kind, query, radius, results) =>
+  trackEvent('near_search', { kind, query: kind === 'me' ? 'me' : query, radius, results })

@@ -72,6 +72,47 @@ function numOrNull(v) {
   return Number.isFinite(n) ? n : null
 }
 
+// Coupons and giveaways (Nov 16 2026). Seven columns on `events`, added by
+// coupons-giveaways.sql; until it runs they are undefined and every row maps
+// to "no deal", so the code can ship before or after the SQL.
+//   coupon_code      'ATHI10'            the code visitors copy
+//   coupon_discount  '10% off'           what it gives, shown on the badge
+//   coupon_note      'online tickets'    optional small print
+//   coupon_url       https://...         optional tracked link for the deal
+//   giveaway_text    'a family 4-pack'   what they can win
+//   giveaway_url     https://...         the reel to enter on
+//   giveaway_end     2026-12-20          last day; the badge hides after it
+// A listing can have a code, a link, or both, and a giveaway with no coupon.
+const httpUrl = (v) => {
+  const u = typeof v === 'string' ? v.trim() : ''
+  return /^https?:\/\//i.test(u) ? u : ''
+}
+function dealFields(e) {
+  const couponCode = typeof e.coupon_code === 'string' ? e.coupon_code.trim() : ''
+  const couponUrl = httpUrl(e.coupon_url)
+  const giveawayText = typeof e.giveaway_text === 'string' ? e.giveaway_text.trim() : ''
+  const giveawayUrl = httpUrl(e.giveaway_url)
+  const giveawayEnd = typeof e.giveaway_end === 'string' && /^\d{4}-\d{2}-\d{2}/.test(e.giveaway_end) ? e.giveaway_end.slice(0, 10) : null
+  // Live through the end of its last day. No end date means it runs until the
+  // fields are cleared.
+  const ended = !!giveawayEnd && new Date(giveawayEnd + 'T23:59:59') < new Date()
+  const hasCoupon = !!(couponCode || couponUrl)
+  const hasGiveaway = !!(giveawayText || giveawayUrl) && !ended
+  return {
+    couponCode,
+    couponDiscount: typeof e.coupon_discount === 'string' ? e.coupon_discount.trim() : '',
+    couponNote: typeof e.coupon_note === 'string' ? e.coupon_note.trim() : '',
+    couponUrl,
+    giveawayText,
+    giveawayUrl,
+    giveawayEnd,
+    hasCoupon,
+    hasGiveaway,
+    hasDeal: hasCoupon || hasGiveaway,
+  }
+}
+const NO_DEAL = dealFields({})
+
 export function mapEvent(e) {
   // Beaches arrive already in app shape (see mapBeach) — passing them through
   // mapEvent a second time would strip category/tags, so short-circuit here.
@@ -144,6 +185,9 @@ export function mapEvent(e) {
     seasonStart: e.season_start || null,
     seasonEnd: e.season_end || null,
     city,
+    // Every listing is in California (events_coords_california), so CA is a
+    // safe default when the row has no venue to read the state from.
+    state: venueState || 'CA',
     fullAddress,
     addressLine,
     lat,
@@ -184,6 +228,7 @@ export function mapEvent(e) {
     mapCity: e.map_city || null,
     mapOnly: e.map_only === true,
     mapPath: Array.isArray(e.map_path) && e.map_path.length > 1 ? e.map_path : null,
+    ...dealFields(e),
   }
 }
  
@@ -206,6 +251,7 @@ export function mapBeach(beach) {
     seasonStart: null,
     seasonEnd: null,
     city: beach.city,
+    state: 'CA',
     fullAddress: beach.fullAddress,
     addressLine: beach.fullAddress || null,
     // Shape parity with mapEvent — a key present in one and absent in the other
@@ -238,6 +284,8 @@ export function mapBeach(beach) {
     mapCity: null,
     mapOnly: false,
     mapPath: null,
+    // Same keys as mapEvent, all empty: beaches carry no deals.
+    ...NO_DEAL,
   }
 }
  

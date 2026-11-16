@@ -1,7 +1,7 @@
 import { useState, useLayoutEffect, useRef } from 'react'
-import { EventImage, ShareGlyph, sizedImageUrl } from './ui.jsx'
+import { EventImage, ShareGlyph, sizedImageUrl, DealBadges } from './ui.jsx'
 import { seasonState } from '../season.js'
-import { PILLS, themeFor, badgesFor, badgeLabel, pillForEvent } from '../constants.js'
+import { PILLS, themeFor, badgesFor, badgeLabel, pillForEvent, placeLabel } from '../constants.js'
 
 // ---------------------------------------------------------------------------
 // Explore redesign (Sep 2026). One template for every list page:
@@ -241,9 +241,12 @@ const hasOfficial = (ev) => {
   return !!u && u !== '#' && !/(^|\.)google\.[a-z.]+\/maps|maps\.google\.|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(u)
 }
 
-function ShareBtn({ onClick, small }) {
+// `corner` pins the button to the top right of the card, over the photo when
+// there is one (RAG, Nov 16 2026). It used to sit beside the title, which put
+// it in a different place on every card depending on the photo.
+function ShareBtn({ onClick, small, corner }) {
   return (
-    <button className={small ? 'nx-sshare' : 'nx-cshare'} onClick={(e) => { e.stopPropagation(); onClick() }} aria-label="Share">
+    <button className={corner ? 'nx-cardshare' : small ? 'nx-sshare' : 'nx-cshare'} onClick={(e) => { e.stopPropagation(); onClick() }} aria-label="Share">
       <ShareGlyph size={small ? 14 : 16} color="#2D2D2D" />
     </button>
   )
@@ -251,6 +254,23 @@ function ShareBtn({ onClick, small }) {
 
 // Round play button over a photo, only when the listing has a video.
 // Opens the Learn more sheet with the video already playing.
+// The place line: a small outline pin, then "Concord, CA". The pin takes the
+// text colour, so it stays quiet next to the green date above it.
+function PlaceLine({ ev }) {
+  // distanceMi is only on a row while the Near bar has a location set.
+  const where = placeLabel(ev)
+  if (!where) return null
+  return (
+    <div className="nx-meta nx-place">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z" />
+        <circle cx="12" cy="9.5" r="2.5" />
+      </svg>
+      <span>{where}{typeof ev.distanceMi === 'number' && ` · ${ev.distanceMi < 10 ? ev.distanceMi.toFixed(1) : Math.round(ev.distanceMi)} mi`}</span>
+    </div>
+  )
+}
+
 function PlayBadge({ onClick, big, right }) {
   return (
     <button className={`nx-play${big || right ? ' big' : ''}`} onClick={(e) => { e.stopPropagation(); onClick() }} aria-label="Watch video">
@@ -271,7 +291,6 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
   // title, date, city, chips in the same order, so Top picks and the list no
   // longer read as two different products.
   const range = openCloseLabel(ev)
-  const where = ev.city || ev.area
   const closed = seasonState(ev).state === 'closed'
   return (
     <article className={`nx-big${closed ? ' closed' : ''}`} onClick={open}>
@@ -283,14 +302,14 @@ export function FeatureCard({ ev, onLearnMore, onOfficial, onDirections, onShare
         <EventImage event={ev} aspectRatio="4 / 3" width={900} />
         {ev.videoUrl && <PlayBadge big onClick={() => onLearnMore(ev, true)} />}
       </div>
+      <ShareBtn corner onClick={() => onShare(ev)} />
       <div className="nx-bigbody">
         <StatusRow ev={ev} hidePrice={hidePrice} page={page} />
         <div className="nx-titlerow">
           <h3>{ev.title}</h3>
-          <ShareBtn small onClick={() => onShare(ev)} />
         </div>
         {range && <div className="nx-when">{range}</div>}
-        {where && <div className="nx-meta">{where}</div>}
+        <PlaceLine ev={ev} />
         {pg ? <AmenityChips ev={ev} /> : <EventChips ev={ev} />}
         {!pg && <CardBadges ev={ev} page={page} onMore={(x) => onLearnMore(x)} />}
         <div className="nx-actions">
@@ -319,11 +338,16 @@ function StatusRow({ ev, hidePrice, page }) {
   if (showNew) items.push(['new', 'Newly opened', '#1A6B4A'])
   if (showFree) items.push(['free', freeLabel(ev, page), '#1A6B4A'])
   if (ev.isEditorPick) items.push(['pick', '✦ Top pick', '#C94F2C'])
-  if (status) items.push(['status', status.text, status.cls === 'closed' ? '#2D2D2D' : '#C94F2C'])
-  if (!items.length) return null
+  // Coupon (gold) and giveaway (purple) sit after Top pick and before the
+  // season state, the order approved on the prototype (Nov 16 2026).
+  const tail = status ? [['status', status.text, status.cls === 'closed' ? '#2D2D2D' : '#C94F2C']] : []
+  if (!items.length && !tail.length && !ev.hasDeal) return null
+  const pillOf = ([k, label, bg]) => <span key={k} className="nx-ob" style={{ background: bg, color: '#fff' }}>{label}</span>
   return (
     <div className="nx-statusrow">
-      {items.map(([k, label, bg]) => <span key={k} className="nx-ob" style={{ background: bg, color: '#fff' }}>{label}</span>)}
+      {items.map(pillOf)}
+      <DealBadges ev={ev} />
+      {tail.map(pillOf)}
     </div>
   )
 }
@@ -342,30 +366,18 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
   const range = openCloseLabel(ev)
   const season = seasonState(ev)
   const closed = season.state === 'closed'
-  const where = ev.city || ev.area
   return (
     <article className={`nx-row${hasPhoto ? ' has-photo' : ''}${closed ? ' closed' : ''}`} onClick={open}>
       <div className="nx-rowbody">
         <StatusRow ev={ev} hidePrice={hidePrice} page={page} />
         <div className="nx-titlerow">
           <h4>{ev.title}</h4>
-          <ShareBtn small onClick={() => onShare(ev)} />
         </div>
-        {/* With a photo the card is tall anyway, so date and place get a line
-            each. Without one, they share a line and the card loses a row. */}
-        {hasPhoto ? (
-          <>
-            {range && <div className="nx-when">{range}</div>}
-            {where && <div className="nx-meta">{where}</div>}
-          </>
-        ) : (
-          (range || where) && (
-            <div className="nx-when">
-              {range}
-              {where && <span className="nx-where">{range ? ` · ${where}` : where}</span>}
-            </div>
-          )
-        )}
+        {/* Date and place get a line each on every card (Nov 16 2026). The
+            no-photo card used to run them together on one line, which left
+            the city as a faint tail on the date. */}
+        {range && <div className="nx-when">{range}</div>}
+        <PlaceLine ev={ev} />
         {pg ? <AmenityChips ev={ev} /> : <EventChips ev={ev} extra={extraChips} />}
         {!pg && <CardBadges ev={ev} page={page} onMore={(x) => onToggle(x, false)} />}
         <div className="nx-rowactions">
@@ -386,6 +398,7 @@ export function CompactRow({ ev, onToggle, onOfficial, onDirections, onShare, hi
           )}
         </div>
       )}
+      <ShareBtn corner onClick={() => onShare(ev)} />
     </article>
   )
 }

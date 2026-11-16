@@ -34,6 +34,11 @@ export function readFilters(search, pillLabels, regions) {
     section: p.get('section') || null,
     // Redesign: the Near [city] picker. Stored as the city name itself.
     city: p.get('city') || null,
+    // The Near bar (Nov 16 2026): a zip or a city, with its miles. App.jsx
+    // looks the place up again on load. "Use my location" is never written
+    // here, so a shared link cannot carry anyone's position.
+    near: (p.get('near') || '').trim().slice(0, 40) || null,
+    mi: [5, 10, 15, 25].includes(Number(p.get('mi'))) ? Number(p.get('mi')) : 10,
   }
 }
 
@@ -57,6 +62,7 @@ export function writeFilters(f) {
   // silently never scrolls.
   if (f.section) p.set('section', f.section)
   if (f.city) p.set('city', f.city)
+  if (f.near) { p.set('near', f.near); if (f.mi && f.mi !== 10) p.set('mi', String(f.mi)) }
   const qs = p.toString()
   const url = qs ? `${location.pathname}?${qs}` : location.pathname
   window.history.replaceState(null, '', url)
